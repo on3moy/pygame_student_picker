@@ -1,0 +1,42 @@
+{
+  "deadzone": 0.15,
+  "mouse_speed": 18,
+  "poll_hz": 60,
+
+  "_comment": "Map raw controller inputs to actions. Action strings are listed in the README. Button/axis numbers may differ per unit - run the script and use the diagnostic mode (it prints which button index you press) to confirm, then edit the numbers here.",
+
+  "_available_buttons": {
+    "_comment": "Reference only, not read by the script. Standard SDL/pygame CONTROLLER_BUTTON_* index -> name, confirmed against this controller's working config below.",
+    "0": "A", "1": "B", "2": "X", "3": "Y",
+    "4": "BACK", "5": "GUIDE", "6": "START",
+    "7": "LEFTSTICK", "8": "RIGHTSTICK",
+    "9": "LEFTSHOULDER", "10": "RIGHTSHOULDER",
+    "11": "DPAD_UP", "12": "DPAD_DOWN", "13": "DPAD_LEFT", "14": "DPAD_RIGHT"
+  },
+
+  "_available_actions": {
+    "_comment": "Reference only, not read by the script. 'wired' = already implemented in KEY_ACTIONS (controller_remote.py) and usable now. 'available' = supported by pynput.keyboard.Key but not yet added to KEY_ACTIONS - add an entry there to use one.",
+    "wired": ["click", "left", "right", "up", "down", "pageup", "pagedown", "f5", "esc", "space", "home", "end", "b", "w"],
+    "available": ["alt", "alt_l", "alt_r", "alt_gr", "backspace", "caps_lock", "cmd", "cmd_l", "cmd_r", "ctrl", "ctrl_l", "ctrl_r", "delete", "enter", "f1", "f2", "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "insert", "media_next", "media_play_pause", "media_previous", "media_volume_down", "media_volume_mute", "media_volume_up", "menu", "num_lock", "pause", "print_screen", "scroll_lock", "shift", "shift_l", "shift_r", "tab"]
+  },
+
+  "_source": "pygame controller buttons: https://www.pygame.org/docs/ref/controller.html#pygame.controller.Controller.get_button | pynput keys: https://pynput.readthedocs.io/en/latest/keyboard.html#pynput.keyboard.Key",
+
+  "buttons": {
+    "0": "click",
+    "1": "esc",
+    "3": "f5",
+    "13": "left",
+    "14": "right"
+  },
+
+  "bumpers": {
+    "4": "left",
+    "5": "right"
+  },
+
+  "axes": {
+    "move_x": 0,
+    "move_y": 1
+  }
+}
