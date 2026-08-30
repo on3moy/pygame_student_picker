@@ -13,8 +13,8 @@
   },
   "window": {
     "_comment": "width/height are the window size in pixels; null means use the size the theme was designed at. Resize by dragging the grip in the bottom-right corner, or with + / - (0 resets), and everything on screen scales with it. Screen position in pixels; null centers it. Drag the window with the left mouse button and the new spot is saved here - if that spot turns out to be off-screen next time (projector unplugged), the window centers itself instead. always_on_top keeps the window above your slides and is re-asserted every couple of seconds so a full-screen slideshow cannot bury it; press O to toggle it.",
-    "x": 500,
-    "y": 500,
+    "x": 4436,
+    "y": 1234,
     "width": 457,
     "height": 90,
     "always_on_top": true,
