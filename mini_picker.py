@@ -155,7 +155,7 @@ def button_label(index):
 
 DEFAULT_CONFIG = {
     "students_file": "students.txt",
-    "theme": "stranger_things",
+    "theme": "experimental",
     "controller": {"pick_button": 10, "theme_button": 3, "reset_button": 2,
                    "joystick_index": 0},
     "window": {"x": None, "y": None, "width": None, "height": None,
