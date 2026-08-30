@@ -1,6 +1,9 @@
 {
   "deadzone": 0.15,
   "mouse_speed": 18,
+  "scroll_speed": 12,
+  "scroll_invert": false,
+  "scroll_invert_x": false,
   "poll_hz": 60,
 
   "_comment": "Map raw controller inputs to actions. Action strings are listed in the README. Button/axis numbers may differ per unit - run the script and use the diagnostic mode (it prints which button index you press) to confirm, then edit the numbers here.",
@@ -25,7 +28,7 @@
   "buttons": {
     "0": "click",
     "1": "esc",
-    "3": "f5",
+    "3": "f",
     "13": "left",
     "14": "right"
   },
@@ -37,6 +40,8 @@
 
   "axes": {
     "move_x": 0,
-    "move_y": 1
+    "move_y": 1,
+    "scroll_x": 2,
+    "scroll_y": 3
   }
 }

@@ -1302,7 +1302,7 @@ def main():
                       colors["muted"], colors["glow"], 0, 0)
             hint = "Press F to load a roster"
         elif state == IDLE and not display_name:
-            prompt = f"Press NEXT  ({button_label(cfg['controller'].get('pick_button'))} or Space)"
+            prompt = f"Press NEXT  ({button_label(cfg['controller'].get('pick_button'))} or x)"
             font = fonts.fit(prompt, max_text_w,
                              small_size + round(5 * scale), min_size=8)
             blit_glow(screen, font, prompt, name_center,

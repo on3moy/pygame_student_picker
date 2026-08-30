@@ -7,6 +7,7 @@ you can drive slides (and a bit of mouse) from the controller while lecturing.
 Usage:
     python controller_remote.py            # run the remote
     python controller_remote.py --diagnose # print button/axis numbers as you press them
+    python controller_remote.py --axes     # live readout of every axis value at once
 
 Edit config.json to remap inputs. Press Ctrl+C in the terminal to quit.
 """
@@ -42,6 +43,7 @@ KEY_ACTIONS = {
     "end": Key.end,
     "b": "b",  # PowerPoint/Slides black-screen toggle
     "w": "w",  # PowerPoint white-screen toggle
+    "f": "f",  # full screen
 }
 
 
@@ -98,6 +100,20 @@ def diagnose(js):
         clock.tick(60)
 
 
+def axis_monitor(js):
+    """Live readout of every axis at once, so stick pairs are easy to spot."""
+    print("\nAxis monitor. Move one stick at a time and watch which numbers change.")
+    print("A trigger rests at -1.00; an idle stick rests near 0.00.")
+    print("Press Ctrl+C to quit.\n")
+    n = js.get_numaxes()
+    clock = pygame.time.Clock()
+    while True:
+        pygame.event.pump()
+        row = "  ".join(f"{i}:{js.get_axis(i):+.2f}" for i in range(n))
+        print(row)
+        clock.tick(5)
+
+
 def run(js, cfg):
     deadzone = cfg.get("deadzone", 0.15)
     speed = cfg.get("mouse_speed", 18)
@@ -107,10 +123,18 @@ def run(js, cfg):
     hat_map = cfg.get("hat", {})
     ax_x = cfg.get("axes", {}).get("move_x", 0)
     ax_y = cfg.get("axes", {}).get("move_y", 1)
+    ax_scroll_x = cfg.get("axes", {}).get("scroll_x", 2)
+    ax_scroll_y = cfg.get("axes", {}).get("scroll_y", 3)
+    scroll_speed = cfg.get("scroll_speed", 12)
+    scroll_invert = cfg.get("scroll_invert", False)
+    scroll_invert_x = cfg.get("scroll_invert_x", False)
 
     # Track previous pressed-state so each press fires exactly once.
     prev_buttons = {}
     prev_hat = (0, 0)
+    # Fractional scroll carried between frames so slow stick tilts still scroll.
+    scroll_accum_x = 0.0
+    scroll_accum_y = 0.0
 
     print("\nRemote active. Ctrl+C to quit.\n")
     clock = pygame.time.Clock()
@@ -151,6 +175,35 @@ def run(js, cfg):
             if vx or vy:
                 mouse.move(int(vx * speed), int(vy * speed))
 
+        # --- Right stick -> scroll wheel (continuous, both directions) ---
+        dx = dy = 0
+        if ax_scroll_x is not None and ax_scroll_x < js.get_numaxes():
+            vs = js.get_axis(ax_scroll_x)
+            if abs(vs) < deadzone:
+                scroll_accum_x = 0.0
+            else:
+                # Stick right reads positive, which scrolls the page right.
+                step = vs * scroll_speed / poll_hz
+                if scroll_invert_x:
+                    step = -step
+                scroll_accum_x += step
+                dx = int(scroll_accum_x)
+                scroll_accum_x -= dx
+        if ax_scroll_y is not None and ax_scroll_y < js.get_numaxes():
+            vs = js.get_axis(ax_scroll_y)
+            if abs(vs) < deadzone:
+                scroll_accum_y = 0.0
+            else:
+                # Stick up reads negative, so negate to scroll the page up.
+                step = -vs * scroll_speed / poll_hz
+                if scroll_invert:
+                    step = -step
+                scroll_accum_y += step
+                dy = int(scroll_accum_y)
+                scroll_accum_y -= dy
+        if dx or dy:
+            mouse.scroll(dx, dy)
+
         clock.tick(poll_hz)
 
 
@@ -158,11 +211,15 @@ def main():
     parser = argparse.ArgumentParser(description="GameSir Cyclone 2 presentation remote")
     parser.add_argument("--diagnose", action="store_true",
                         help="print button/axis numbers as you press them")
+    parser.add_argument("--axes", action="store_true",
+                        help="live readout of every axis value at once")
     args = parser.parse_args()
 
     js = init_joystick()
     try:
-        if args.diagnose:
+        if args.axes:
+            axis_monitor(js)
+        elif args.diagnose:
             diagnose(js)
         else:
             cfg = load_config()
