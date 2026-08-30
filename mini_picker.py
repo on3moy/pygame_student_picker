@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.13,<3.14"
-# dependencies = ["pygame>=2.6.1"]
+# dependencies = ["pygame>=2.6.1", "pynput>=1.7"]
 # ///
 """
 Mini student picker - a small always-on-top window that shows one name.
@@ -18,7 +18,10 @@ In normal use there is one button to press: NEXT. Nobody repeats until
 everyone has had a turn, and when the round is done the pool refills itself.
 
 Controls:
-    Space / bound controller button   NEXT - call a student
+    X     / bound controller button   NEXT - call a student. Both work while
+                                      another window has focus: the pad through
+                                      SDL background events, X through a global
+                                      hotkey (see mini_config.json).
     T     / bound controller button   cycle to the next theme in themes/
     R     / bound controller button   start a fresh round early
     L                                 map controller buttons - walks through
@@ -45,8 +48,37 @@ import os
 import random
 import sys
 
+# SDL delivers joystick events only to a window that has input focus, and the
+# picker never has it while you present - you click the slides to drive them,
+# which is exactly when the pad has to work. This opts into background events.
+# It must be set before pygame.init(), because SDL reads the hint when the
+# joystick subsystem starts; setdefault so the environment can still override.
+os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
+
 import pygame
 from pygame._sdl2 import video
+
+try:
+    from pynput import keyboard as pynput_keyboard
+except ImportError:      # the keyboard backup is optional; the pad still works
+    pynput_keyboard = None
+
+# Posted from pynput's thread when the global hotkey fires. The callback does
+# nothing but post this - picker state belongs to the main loop.
+HOTKEY_NEXT = pygame.USEREVENT + 1
+
+
+def log(message):
+    """print() that cannot take the picker down.
+
+    run_picker.cmd starts the picker with pythonw.exe, which can leave
+    sys.stdout as None; printing then raises and kills the app on a path that
+    was only trying to warn about something minor.
+    """
+    try:
+        print(message)
+    except (AttributeError, OSError, ValueError):
+        pass
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "mini_config.json")
@@ -94,6 +126,21 @@ MAPPABLE = (("pick_button", "call the NEXT student", "Next"),
             ("reset_button", "RESET the round early", "Reset"))
 
 
+def hotkey_spec(text):
+    """'ctrl+space' -> '<ctrl>+<space>', the form GlobalHotKeys parses.
+
+    Single printable characters stay bare ('x' stays 'x'); named keys and
+    modifiers get wrapped.
+    """
+    parts = []
+    for part in str(text).lower().split("+"):
+        part = part.strip()
+        if not part:
+            continue
+        parts.append(part if len(part) == 1 and part.isalnum() else f"<{part}>")
+    return "+".join(parts)
+
+
 def button_label(index):
     """'Y (3)' for a known pad button, '(3)' for one we have no name for."""
     if index is None:
@@ -113,6 +160,7 @@ DEFAULT_CONFIG = {
                    "joystick_index": 0},
     "window": {"x": None, "y": None, "width": None, "height": None,
                "always_on_top": True},
+    "hotkey": {"next": "x", "enabled": True},
     "spin_ms": 1400,
     "no_repeats": True,
 }
@@ -163,7 +211,7 @@ def load_config():
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             return _merge(DEFAULT_CONFIG, json.load(f))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"[mini_picker] could not read mini_config.json ({exc}); using defaults")
+        log(f"[mini_picker] could not read mini_config.json ({exc}); using defaults")
         return dict(DEFAULT_CONFIG)
 
 
@@ -191,7 +239,7 @@ def save_config(cfg):
             json.dump(blend(on_disk, cfg), f, indent=2)
             f.write("\n")
     except OSError as exc:
-        print(f"[mini_picker] could not save mini_config.json ({exc})")
+        log(f"[mini_picker] could not save mini_config.json ({exc})")
 
 
 def list_themes():
@@ -205,13 +253,13 @@ def load_theme(name):
     """Load themes/<name>.json, filled in from DEFAULT_THEME for any missing key."""
     path = os.path.join(THEMES_DIR, f"{name}.json")
     if not os.path.exists(path):
-        print(f"[mini_picker] theme '{name}' not found; using fallback")
+        log(f"[mini_picker] theme '{name}' not found; using fallback")
         return dict(DEFAULT_THEME)
     try:
         with open(path, "r", encoding="utf-8") as f:
             return _merge(DEFAULT_THEME, json.load(f))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"[mini_picker] could not read theme '{name}' ({exc}); using fallback")
+        log(f"[mini_picker] could not read theme '{name}' ({exc}); using fallback")
         return dict(DEFAULT_THEME)
 
 
@@ -312,7 +360,7 @@ def set_always_on_top(enabled):
     except (KeyError, AttributeError, OSError) as exc:
         global _topmost_warned
         if not _topmost_warned:          # the loop re-asserts; warn once, not forever
-            print(f"[mini_picker] always-on-top unavailable ({exc})")
+            log(f"[mini_picker] always-on-top unavailable ({exc})")
             _topmost_warned = True
         return False
 
@@ -775,7 +823,7 @@ def main():
         os.environ["SDL_VIDEO_WINDOW_POS"] = f"{saved_x},{saved_y}"
     else:
         if saved_x is not None:
-            print("[mini_picker] saved window position is off-screen; centering")
+            log("[mini_picker] saved window position is off-screen; centering")
             cfg["window"]["x"] = cfg["window"]["y"] = None
         os.environ["SDL_VIDEO_CENTERED"] = "1"
     screen = pygame.display.set_mode((width, height), flags)
@@ -824,6 +872,25 @@ def main():
             joystick = None
 
     connect_joystick()
+
+    # --- keyboard backup ---
+    # A global hook, because the picker is unfocused exactly when it is needed:
+    # if the pad dies mid-lecture this is what still calls a student. It only
+    # observes - the key is not consumed, so it reaches your slides as usual.
+    hotkeys = None
+    hk_cfg = cfg.get("hotkey", {})
+    hk_next = hk_cfg.get("next") if hk_cfg.get("enabled", True) else None
+    if hk_next and pynput_keyboard is not None:
+        try:
+            hotkeys = pynput_keyboard.GlobalHotKeys({
+                hotkey_spec(hk_next):
+                    lambda: pygame.event.post(pygame.event.Event(HOTKEY_NEXT))})
+            hotkeys.start()
+        except (ValueError, OSError) as exc:
+            log(f"[mini_picker] keyboard backup off - bad hotkey {hk_next!r} ({exc})")
+            hotkeys = None
+    elif hk_next:
+        log("[mini_picker] keyboard backup off - pynput is not installed")
 
     state = IDLE
     display_name = ""
@@ -1090,7 +1157,7 @@ def main():
                         notify("Mapping cancelled")
                     else:
                         running = False
-                elif event.key == pygame.K_SPACE:
+                elif event.key == pygame.K_x:
                     on_pick()
                 elif event.key == pygame.K_r:
                     reset_pool()
@@ -1121,6 +1188,12 @@ def main():
                     set_always_on_top(on_top)   # dialog steals topmost; re-assert
                     if chosen:
                         swap_roster(chosen)
+
+            elif event.type == HOTKEY_NEXT:
+                # No focus test: when the picker does have focus the same key
+                # also arrives as a KEYDOWN, but on_pick() only acts from
+                # IDLE/RESULT, so the second call lands mid-spin and is ignored.
+                on_pick()
 
             elif event.type == pygame.JOYBUTTONDOWN:
                 bound = cfg["controller"]
@@ -1288,6 +1361,8 @@ def main():
 
     remember_position()
     persist()
+    if hotkeys is not None:
+        hotkeys.stop()
     pygame.quit()
 
 
