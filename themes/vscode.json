@@ -1,0 +1,167 @@
+{
+  "name": "VS Code Dark+",
+  "window": {
+    "width": 560,
+    "height": 190,
+    "borderless": true,
+    "opacity": 1.0,
+    "padding": 14,
+    "corner_radius": 10,
+    "border_width": 3
+  },
+  "font": {
+    "_comment": "Shared across dracula, monokai, csulb, vscode and cyberpunk. Orbitron and Rajdhani are the real technical faces; install either and it wins. Bahnschrift (DIN, ships with Windows) is the fallback that is actually present. uppercase draws every name in caps.",
+    "candidates": [
+      "Orbitron",
+      "Rajdhani",
+      "Bahnschrift",
+      "Agency FB",
+      "Consolas",
+      "DejaVu Sans Mono",
+      "monospace"
+    ],
+    "name_size": 50,
+    "small_size": 14,
+    "bold": true,
+    "uppercase": true,
+    "fill": 0.94
+  },
+  "colors": {
+    "bg_top": [
+      30,
+      30,
+      30
+    ],
+    "bg_bottom": [
+      37,
+      37,
+      38
+    ],
+    "border": [
+      0,
+      122,
+      204
+    ],
+    "border_flash": [
+      79,
+      193,
+      255
+    ],
+    "name": [
+      212,
+      212,
+      212
+    ],
+    "name_winner": [
+      79,
+      193,
+      255
+    ],
+    "muted": [
+      133,
+      133,
+      133
+    ],
+    "glow": [
+      0,
+      122,
+      204
+    ]
+  },
+  "glow": {
+    "_comment": "Bloom behind the winning name. Off: the name renders crisp. Set enabled true (with a radius) to bring the halo back.",
+    "enabled": false,
+    "radius": 0,
+    "alpha": 0
+  },
+  "background": {
+    "gradient": true,
+    "spotlight": {
+      "enabled": true,
+      "color": [
+        0,
+        122,
+        204
+      ],
+      "alpha": 51,
+      "spread": 2.0
+    },
+    "rays": {
+      "enabled": false
+    },
+    "motes": {
+      "enabled": false
+    },
+    "vignette": {
+      "enabled": true,
+      "color": [
+        0,
+        0,
+        0
+      ],
+      "alpha": 80,
+      "spread": 1.6
+    },
+    "scanbar": {
+      "_comment": "The theme's one animation: a band that blends through every colour in this theme's palette, sweeping down the panel. height is a fraction of the window; period is seconds per sweep.",
+      "enabled": true,
+      "colors": [
+        [
+          0,
+          122,
+          204
+        ],
+        [
+          79,
+          193,
+          255
+        ],
+        [
+          156,
+          220,
+          254
+        ],
+        [
+          86,
+          156,
+          214
+        ],
+        [
+          133,
+          133,
+          133
+        ]
+      ],
+      "alpha": 46,
+      "height": 0.55,
+      "period": 5.0
+    }
+  },
+  "name_fx": {
+    "glitch": {
+      "_comment": "Every period_ms, the name tears for duration_ms: colour-fringed ghosts thrown either side, then the name redrawn in sliced offsets. Same timing as cyberpunk; the fringe colours come from this theme's palette.",
+      "enabled": true,
+      "period_ms": 2300,
+      "duration_ms": 200,
+      "step_ms": 55,
+      "slices": 7,
+      "shift": 11,
+      "colors": [
+        [
+          0,
+          122,
+          204
+        ],
+        [
+          156,
+          220,
+          254
+        ]
+      ],
+      "alpha": 165
+    }
+  },
+  "footer": {
+    "show_counter": true
+  }
+}

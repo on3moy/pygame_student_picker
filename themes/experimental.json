@@ -1,0 +1,91 @@
+{
+  "name": "Experimental Flat",
+  "window": {
+    "width": 560,
+    "height": 190,
+    "borderless": true,
+    "opacity": 1.0,
+    "padding": 14,
+    "corner_radius": 14,
+    "border_width": 2
+  },
+  "font": {
+    "candidates": [
+      "Segoe UI",
+      "Helvetica Neue",
+      "Inter",
+      "Arial",
+      "sans"
+    ],
+    "name_size": 48,
+    "small_size": 14,
+    "bold": true
+  },
+  "colors": {
+    "bg_top": [
+      16,
+      16,
+      19
+    ],
+    "bg_bottom": [
+      14,
+      14,
+      17
+    ],
+    "border": [
+      58,
+      58,
+      68
+    ],
+    "border_flash": [
+      232,
+      232,
+      240
+    ],
+    "name": [
+      244,
+      244,
+      247
+    ],
+    "name_winner": [
+      255,
+      255,
+      255
+    ],
+    "muted": [
+      110,
+      110,
+      122
+    ],
+    "glow": [
+      255,
+      255,
+      255
+    ]
+  },
+  "glow": {
+    "_comment": "Bloom behind the winning name. Off: the name renders crisp. Set enabled true (with a radius) to bring the halo back.",
+    "enabled": false,
+    "radius": 0,
+    "alpha": 0
+  },
+  "background": {
+    "_comment": "Deliberately quiet: no rays, no motes, no vignette, flat fill. Just type on a surface.",
+    "gradient": false,
+    "spotlight": {
+      "enabled": false
+    },
+    "rays": {
+      "enabled": false
+    },
+    "motes": {
+      "enabled": false
+    },
+    "vignette": {
+      "enabled": false
+    }
+  },
+  "footer": {
+    "show_counter": true
+  }
+}

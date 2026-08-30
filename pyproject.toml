@@ -1,7 +1,7 @@
 [project]
 name = "pygame-student-picker"
 version = "0.1.0"
-description = "Pixel-graphic random student picker with controller + keyboard support"
+description = "Always-on-top random student picker with controller + keyboard support"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [

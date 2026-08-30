@@ -1,0 +1,128 @@
+{
+  "name": "Cyberpunk",
+  "_comment": "Cyberpunk 2077 livery: 2077 yellow on a flat hot-red ground. The background is deliberately dead - no gradient, grid, rays, motes, scanbar, scanlines or vignette - so the only thing moving is the name, which glitches every couple of seconds. Set in caps in a technical face.",
+  "window": {
+    "width": 560,
+    "height": 190,
+    "borderless": true,
+    "opacity": 1.0,
+    "padding": 14,
+    "corner_radius": 2,
+    "border_width": 3
+  },
+  "font": {
+    "_comment": "Orbitron and Rajdhani are the real 2077-adjacent faces; install either and it wins. Bahnschrift (DIN, ships with Windows) is the fallback that is actually present. uppercase draws every name in caps.",
+    "candidates": [
+      "Orbitron",
+      "Rajdhani",
+      "Bahnschrift",
+      "Agency FB",
+      "Consolas",
+      "DejaVu Sans Mono",
+      "monospace"
+    ],
+    "name_size": 50,
+    "small_size": 14,
+    "bold": true,
+    "uppercase": true
+  },
+  "colors": {
+    "bg_top": [
+      226,
+      26,
+      34
+    ],
+    "bg_bottom": [
+      226,
+      26,
+      34
+    ],
+    "border": [
+      252,
+      238,
+      10
+    ],
+    "border_flash": [
+      255,
+      255,
+      210
+    ],
+    "name": [
+      252,
+      238,
+      10
+    ],
+    "name_winner": [
+      255,
+      246,
+      74
+    ],
+    "muted": [
+      255,
+      186,
+      120
+    ],
+    "glow": [
+      252,
+      238,
+      10
+    ]
+  },
+  "glow": {
+    "enabled": false,
+    "radius": 0,
+    "alpha": 0
+  },
+  "background": {
+    "_comment": "Everything off - the panel is a flat fill of bg_bottom and nothing draws on top of it.",
+    "gradient": false,
+    "spotlight": {
+      "enabled": false
+    },
+    "grid": {
+      "enabled": false
+    },
+    "rays": {
+      "enabled": false
+    },
+    "motes": {
+      "enabled": false
+    },
+    "scanbar": {
+      "enabled": false
+    },
+    "scanlines": {
+      "enabled": false
+    },
+    "vignette": {
+      "enabled": false
+    }
+  },
+  "name_fx": {
+    "glitch": {
+      "_comment": "Every period_ms, the name tears for duration_ms: colour-fringed ghosts thrown either side, then the name redrawn in sliced offsets.",
+      "enabled": true,
+      "period_ms": 2300,
+      "duration_ms": 200,
+      "step_ms": 55,
+      "slices": 7,
+      "shift": 11,
+      "colors": [
+        [
+          255,
+          255,
+          255
+        ],
+        [
+          0,
+          240,
+          255
+        ]
+      ],
+      "alpha": 165
+    }
+  },
+  "footer": {
+    "show_counter": true
+  }
+}
