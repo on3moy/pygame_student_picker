@@ -1,6 +1,6 @@
 {
   "deadzone": 0.05,
-  "mouse_speed": 100,
+  "mouse_speed": 70,
   "poll_hz": 60,
   "_comment": "Map raw controller inputs to actions. Action strings are listed in the README. Button/axis numbers may differ per unit - run the script and use the diagnostic mode (it prints which button index you press) to confirm, then edit the numbers here. Run --setup once to calibrate deadzone/axis_max for your controller, and --test to verify the sensitivity zones feel right.",
   "axis_max": {
@@ -12,7 +12,7 @@
   "buttons": {
     "0": "click",
     "1": "esc",
-    "3": "f5",
+    "3": "f",
     "13": "left",
     "14": "right"
   },
