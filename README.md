@@ -39,7 +39,9 @@ shortcut to it. That is the one to use while teaching — see
 [no console window](#no-console-window) below.
 
 **Linux:** run **`linux/run_picker.sh`**. It starts the picker detached and
-keeps the controller remote in the terminal (Ctrl+C stops it).
+keeps the controller remote in the terminal (Ctrl+C stops it). The Linux picker
+is a plain window that leaves placement to your compositor — see
+[Linux (Hyprland / Omarchy)](#linux-hyprland--omarchy).
 
 From a terminal:
 
@@ -98,11 +100,11 @@ only; they are not written back to `mini_config.json`.
 | `T` / pad **Y** (3) | Cycle to the next theme in `themes/` |
 | `R` / pad **X** (2) | Start a fresh round early (rarely needed — see below) |
 | `L` | Map your controller buttons (see below) |
-| `H` | Show the current button mapping |
+| `H` | Show the current button mapping (Linux: a popup listing every control — see below) |
 | `F` | Load a different roster `.txt` |
-| `O` | Toggle always-on-top |
-| Left-drag | Move the window (its position is remembered) |
-| Drag the corner grip | Resize the window |
+| `O` | Toggle always-on-top (Windows only) |
+| Left-drag | Move the window, position remembered (Windows only) |
+| Drag the corner grip | Resize the window (Windows only) |
 | `+` / `-` | Grow / shrink the window |
 | `0` | Reset to the theme's design size |
 | `Ctrl` + mouse wheel | Grow / shrink the window |
@@ -375,6 +377,46 @@ everything else works cross-platform.
 If a saved window position turns out to be off-screen the next time you start —
 you dragged it onto a projector, then unplugged the projector — the picker
 notices and centers itself instead of opening somewhere you cannot reach.
+
+## Linux (Hyprland / Omarchy)
+
+`linux/mini_picker.py` behaves like any other app window. It does not pin
+itself on top, move itself, remember a screen position, or draw a resize grip:
+on Wayland an app cannot place its own window anyway, and Hyprland can do all
+of that better with window rules. The window's class (Wayland app id) is
+**`student-picker`** — match it in a rule to float, pin, size or place it. It
+runs as a native Wayland client, not through XWayland.
+
+Linux-specific behavior:
+
+- **Size.** A size the compositor hands the window (tiling, a super-drag
+  resize) is followed but not saved. Only `+` / `-` / `0` / `Ctrl`+wheel write
+  `window.width` / `window.height`. `window.x`, `window.y` and
+  `window.always_on_top` are left alone for the Windows version, which shares
+  `mini_config.json`.
+- **Global NEXT.** Wayland does not let apps watch the keyboard, so the
+  `hotkey` setting only works under X11. Instead, the picker calls the next
+  student when it gets `SIGUSR1`. The process is named `student-picker`, so
+  bind this to a key in Hyprland (F9 is the one shown in the help popup):
+
+  ```lua
+  -- ~/.config/hypr/bindings.lua
+  o.bind("F9", "Student picker: next", "pkill -USR1 -x student-picker")
+  ```
+
+  The controller's NEXT button works without focus either way.
+- **CPU.** The picker redraws only when the picture changes. A still theme
+  (`experimental`, `cyberpunk` between glitches) sits near 0% CPU. Themes with
+  a scan bar redraw just the strip the bar moves through.
+- **Idle.** The open window does not block the screensaver or lock screen.
+- **`H`** pops up every control in a window drawn in the current theme, with
+  the pad buttons as currently mapped. Arrow keys or the mouse select a row,
+  Enter or a click runs it, Esc closes it. Hyprland floats it over the picker
+  as a dialog. The footer shows `H for help` so the controls are easy to find.
+- **`F`** opens a zenity file dialog (tkinter if zenity is missing) without
+  freezing the picker.
+- **Quitting.** `SIGTERM` (`pkill -x student-picker`) quits cleanly and
+  saves settings, the same as `Esc`.
 
 ## Students list
 
