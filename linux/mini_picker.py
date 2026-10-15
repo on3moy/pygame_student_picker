@@ -7,7 +7,8 @@ Mini student picker - a small always-on-top window that shows one name.
 
 Built for presenting: it floats above your slides so the class can see who
 got called, and a single controller button rolls the next name. Everything
-you would want to change lives in two JSON files next to this script:
+you would want to change lives in JSON files at the repo root, shared by
+the windows/ and linux/ versions of this script:
 
     mini_config.json   which roster, which controller buttons, where the
                        window sits, how long the names shuffle. The roster is
@@ -80,7 +81,9 @@ def log(message):
     except (AttributeError, OSError, ValueError):
         pass
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# The script lives in an OS folder (windows/ or linux/); the config, roster and
+# themes are shared between them and sit one level up, at the repo root.
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "mini_config.json")
 THEMES_DIR = os.path.join(BASE_DIR, "themes")
 

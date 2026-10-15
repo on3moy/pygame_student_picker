@@ -8,6 +8,24 @@ on its own.
 This project uses [**uv**](https://docs.astral.sh/uv/) for environment and dependency
 management.
 
+## Layout
+
+The code is split per operating system; everything you edit is shared and
+lives at the repo root.
+
+```
+config.json          controller remote mapping        (shared)
+mini_config.json     picker settings                  (shared)
+students.txt         default roster                   (shared)
+themes/*.json        picker themes                    (shared)
+windows/             mini_picker.py, controller_remote.py, run_picker.cmd
+linux/               mini_picker.py, controller_remote.py, run_picker.sh
+```
+
+Both versions read the configs, roster and themes from the repo root, so a
+change there applies on either OS. Commands below use `windows/`; swap in
+`linux/` on Linux.
+
 ## Setup
 
 ```sh
@@ -16,20 +34,24 @@ uv sync
 
 ## Run
 
-Double-click **`run_picker.cmd`**, or make a desktop shortcut to it. That is the
-one to use while teaching — see [no console window](#no-console-window) below.
+**Windows:** double-click **`windows\run_picker.cmd`**, or make a desktop
+shortcut to it. That is the one to use while teaching — see
+[no console window](#no-console-window) below.
+
+**Linux:** run **`linux/run_picker.sh`**. It starts the picker detached and
+keeps the controller remote in the terminal (Ctrl+C stops it).
 
 From a terminal:
 
 ```sh
-uv run mini_picker.py
+uv run windows/mini_picker.py
 ```
 
 Because `mini_picker.py` has a PEP 723 inline-dependency header, you can also run it
-without `uv sync` from anywhere:
+without `uv sync`:
 
 ```sh
-uv run --script mini_picker.py
+uv run --script windows/mini_picker.py
 ```
 
 ### No console window
@@ -38,7 +60,7 @@ uv run --script mini_picker.py
 from a shortcut that points at `uv` or `python` — leaves a black console window
 sitting behind it for the whole lecture.
 
-`run_picker.cmd` starts the picker with `pythonw.exe` instead: the same
+`windows\run_picker.cmd` starts the picker with `pythonw.exe` instead: the same
 interpreter with no console attached. The picker window appears on its own,
 with nothing else on screen. Run `uv sync` once first so `.venv` exists.
 
@@ -49,8 +71,8 @@ only when you press `F`.
 The controller presentation remote:
 
 ```sh
-uv run controller_remote.py
-uv run controller_remote.py --diagnose   # print button/axis numbers
+uv run windows/controller_remote.py
+uv run windows/controller_remote.py --diagnose   # print button/axis numbers
 ```
 
 ## The picker
@@ -59,9 +81,9 @@ uv run controller_remote.py --diagnose   # print button/axis numbers
 shows nothing but the name.
 
 ```sh
-uv run mini_picker.py                        # uses mini_config.json
-uv run mini_picker.py rosters/is640.txt      # one-off roster for this run
-uv run mini_picker.py --theme dracula        # one-off theme for this run
+uv run windows/mini_picker.py                        # uses mini_config.json
+uv run windows/mini_picker.py rosters/is640.txt      # one-off roster for this run
+uv run windows/mini_picker.py --theme dracula        # one-off theme for this run
 ```
 
 The roster can be given as a bare path or with `--students` / `-s`; the theme
@@ -153,7 +175,7 @@ if you have more than one plugged in. The standard SDL button numbers are:
 
 Numbers can differ between controllers. If yours does not match, use `L` — it
 reads whatever your pad actually sends — or run
-`uv run controller_remote.py --diagnose` to print the index of each button as
+`uv run windows/controller_remote.py --diagnose` to print the index of each button as
 you press it.
 
 Note that `controller_remote.py` has its own separate mapping in `config.json`;
@@ -166,7 +188,7 @@ Behavior — which roster, which buttons, where the window sits
 
 | Key | Meaning |
 | --- | --- |
-| `students_file` | Roster path. Relative paths resolve next to the script. |
+| `students_file` | Roster path. Relative paths resolve from the repo root. |
 | `theme` | Filename (no `.json`) of a theme in `themes/`. |
 | `controller.pick_button` | Button that draws a name. |
 | `controller.theme_button` | Button that cycles to the next theme. |

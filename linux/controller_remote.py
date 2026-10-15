@@ -24,7 +24,8 @@ import pygame
 from pynput.keyboard import Controller as Keyboard, Key
 from pynput.mouse import Button, Controller as Mouse
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+# config.json is shared by the windows/ and linux/ versions, at the repo root.
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 keyboard = Keyboard()
 mouse = Mouse()
