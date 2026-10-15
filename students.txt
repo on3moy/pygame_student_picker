@@ -1,12 +1,30 @@
-Ada Lovelace
-Alan Turing
-Grace Hopper
-Katherine Johnson
-Linus Torvalds
-Margaret Hamilton
-Dennis Ritchie
-Barbara Liskov
-Donald Knuth
-Radia Perlman
-Tim Berners-Lee
-Hedy Lamarr
+Nicolas Bonilla
+Ahnyier Chambliss
+Alexander Devore
+Mohammad Hadi Fard Shahin
+Erbing Garcia
+Maya Gbur
+Sean Gorden
+Habib Jahshan
+Marcus James
+Brian Jones
+Kaung Myat Ko Ko
+Himanshu Ladole
+Yen Ling Liu
+Peter Madsen
+Ibuchi Mgbeke
+Ruben Moran
+Dontae Mosbey
+Arjun Nair
+Giang Nguyen
+Michele Nguyen
+Lauren Oyama
+Ross Paseban Mousaabad
+Sara Paseban Mousaabad
+Hoang Nam Pham
+Jordan Recinos
+Zachery Rouzaud
+Joshua Summers
+Siva Sai Navya Tallapati
+Selin Tunac
+Maxim Vekhbe

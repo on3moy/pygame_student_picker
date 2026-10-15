@@ -1,11 +1,11 @@
 @echo off
 rem Start everything a lecture needs on Windows: the student picker, and
 rem the controller remote that turns D-pad presses into the arrow keys your
-rem slides listen for. The scripts live in this windows\ folder; their configs,
-rem the roster and the themes are shared and live at the repo root.
+rem slides listen for. The scripts and their configs live in this windows\
+rem folder; the roster and the themes are shared and live at the repo root.
 rem
-rem   windows\mini_picker.py       + mini_config.json   the picker
-rem   windows\controller_remote.py + config.json        the slide remote
+rem   windows\mini_picker.py       + windows\mini_config.json   the picker
+rem   windows\controller_remote.py + windows\config.json        the slide remote
 rem
 rem Run "uv sync" once at the repo root first so .venv exists. Make a desktop shortcut to this
 rem file and both are one double-click away. Turn the controller on BEFORE

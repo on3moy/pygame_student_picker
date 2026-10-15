@@ -7,10 +7,9 @@ Mini student picker (Linux) - a small window that shows one name.
 
 Built for presenting: the class can see who got called, and a single
 controller button rolls the next name. Everything you would want to change
-lives in JSON files at the repo root, shared by the windows/ and linux/
-versions of this script:
+lives in JSON files:
 
-    mini_config.json   which roster, which controller buttons, how long the
+    mini_config.json   (next to this script, Linux only) which roster, which controller buttons, how long the
                        names shuffle. The roster is re-read while running, so
                        edits to it land live.
     themes/*.json      colors, fonts, window size - one file per theme
@@ -107,10 +106,10 @@ def log(message):
     except (AttributeError, OSError, ValueError):
         pass
 
-# The script lives in an OS folder (windows/ or linux/); the config, roster and
-# themes are shared between them and sit one level up, at the repo root.
+# The script lives in an OS folder (windows/ or linux/) next to its own
+# mini_config.json; the roster and themes are shared and sit one level up.
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_PATH = os.path.join(BASE_DIR, "mini_config.json")
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mini_config.json")
 THEMES_DIR = os.path.join(BASE_DIR, "themes")
 
 IDLE, SPINNING, RESULT = "idle", "spinning", "result"
@@ -133,11 +132,11 @@ RESIZE_STEP = 1.1         # keyboard / ctrl-wheel zoom per press
 # class are separate types that both derive from RuntimeError.
 WINDOW_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
 
-# Standard SDL pad layout, used only to label buttons in messages.
+# Pad layout as SDL numbers it on Linux (evdev order), used only to label
+# buttons in messages. The D-pad is a hat here, not buttons.
 BUTTON_NAMES = {
-    0: "A", 1: "B", 2: "X", 3: "Y", 4: "BACK", 5: "GUIDE", 6: "START",
-    7: "L-STICK", 8: "R-STICK", 9: "LB", 10: "RB",
-    11: "D-UP", 12: "D-DOWN", 13: "D-LEFT", 14: "D-RIGHT",
+    0: "A", 1: "B", 2: "Y", 3: "X", 4: "LB", 5: "RB", 6: "LT", 7: "RT",
+    8: "BACK", 9: "START", 10: "GUIDE", 11: "L-STICK", 12: "R-STICK",
 }
 
 # (config key, wizard prompt, short name) in the order the L wizard asks.
@@ -145,7 +144,8 @@ BUTTON_NAMES = {
 # so reset is a convenience rather than part of the normal flow.
 MAPPABLE = (("pick_button", "call the NEXT student", "Next"),
             ("theme_button", "change the THEME", "Theme"),
-            ("reset_button", "RESET the round early", "Reset"))
+            ("reset_button", "RESET the round early", "Reset"),
+            ("roster_button", "OPEN a roster file", "Roster"))
 
 
 def hotkey_spec(text):
@@ -183,7 +183,8 @@ def button_label(index):
 DEFAULT_CONFIG = {
     "students_file": "students.txt",
     "theme": "experimental",
-    "controller": {"pick_button": 10, "theme_button": 3, "reset_button": 2,
+    "controller": {"pick_button": 5, "theme_button": 2, "reset_button": 3,
+                   "roster_button": 9,
                    "joystick_index": 0},
     "window": {"x": None, "y": None, "width": None, "height": None,
                "always_on_top": True},
@@ -1053,8 +1054,7 @@ def main():
         """Save settings, minus one-off CLI overrides the user did not touch.
 
         Window position and always_on_top are never written from Linux: the
-        compositor owns placement here, and those keys still drive the
-        Windows version, which shares mini_config.json.
+        compositor owns placement here.
         """
         save_config({k: v for k, v in cfg.items()
                      if k not in cli_keys or k in changed_in_app})
@@ -1338,7 +1338,7 @@ def main():
             ("F9", "Next student, from any window", on_pick),
             ("L", "Map controller buttons", start_mapping),
             ("S  /  ESC  (while mapping)", "Skip a button / cancel", None),
-            ("F", "Load roster", open_roster_dialog),
+            (with_pad("F", "roster_button"), "Load roster", open_roster_dialog),
             ("+  or  CTRL + WHEEL UP", "Grow the window",
              lambda: zoom(RESIZE_STEP)),
             ("-  or  CTRL + WHEEL DOWN", "Shrink the window",
@@ -1519,6 +1519,8 @@ def main():
                     cycle_theme()
                 elif event.button == bound.get("reset_button"):
                     reset_pool()
+                elif event.button == bound.get("roster_button"):
+                    open_roster_dialog()
 
             elif event.type in (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED):
                 connect_joystick()

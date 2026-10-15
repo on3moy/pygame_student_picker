@@ -1,0 +1,33 @@
+{
+  "_comment": "Behavior settings for mini_picker.py. Looks live in themes/*.json. The picker rewrites this file when you rebind controller buttons (L), cycle the theme (T), move the window, or load a different roster (F).",
+  "students_file": "/home/on3moy/Documents/vscode/github/pygame_student_picker/students.txt",
+  "_students_file": "Path to the roster .txt, one name per line. Relative paths resolve against this folder; absolute paths work too. The file is re-read about once a second while running, so edits land without a restart.",
+  "theme": "vscode",
+  "_theme": "Filename (without .json) of a theme in themes/. T on the keyboard or Y on the pad cycles through them.",
+  "controller": {
+    "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset / roster - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Linux pad indexes: 0=A 1=B 2=Y 3=X 4=LB 5=RB 6=LT 7=RT 8=BACK 9=START 10=GUIDE 11=L-STICK 12=R-STICK (the D-pad is a hat, not buttons).",
+    "pick_button": 3,
+    "theme_button": 6,
+    "reset_button": 7,
+    "roster_button": 9,
+    "joystick_index": 0
+  },
+  "window": {
+    "_comment": "width/height are the window size in pixels; null means use the size the theme was designed at. Resize by dragging the grip in the bottom-right corner, or with + / - (0 resets), and everything on screen scales with it. Screen position in pixels; null centers it. Drag the window with the left mouse button and the new spot is saved here - if that spot turns out to be off-screen next time (projector unplugged), the window centers itself instead. always_on_top keeps the window above your slides and is re-asserted every couple of seconds so a full-screen slideshow cannot bury it; press O to toggle it.",
+    "x": 2166,
+    "y": 1004,
+    "width": 560,
+    "height": 190,
+    "always_on_top": true,
+    "never_focus": false
+  },
+  "spin_ms": 1400,
+  "_spin_ms": "How long the names shuffle before landing. Set 0 to jump straight to the winner.",
+  "no_repeats": true,
+  "_no_repeats": "true = a picked student leaves the pool until everyone has been called. false = every pick draws from the full roster.",
+  "hotkey": {
+    "_comment": "Keyboard backup for NEXT. This is a global hook: it works while your slides have focus, which is exactly when you need it. The key is not swallowed, so pick one your slides ignore - 'x' is safe; 'p' toggles presenter view and 'space' advances the slide. Only a real key press triggers it; keys sent by another program (controller_remote.py) are ignored. Set enabled false, or next null, to turn the hook off. Combos work: \"ctrl+space\", \"f9\".",
+    "next": "x",
+    "enabled": true
+  }
+}

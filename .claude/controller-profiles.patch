@@ -1,0 +1,820 @@
+From 4273b296250f6fc8dee97fb595787e48aadaba12 Mon Sep 17 00:00:00 2001
+From: Moy Patel <on3moy@gmail.com>
+Date: Thu, 15 Oct 2026 16:34:06 -0700
+Subject: [PATCH] Add controller profiles and map_controller.py
+
+Button numbers vary by pad, mode and OS, so configs now refer to buttons
+by name ("LB", "RT") through a profile in controllers/. map_controller.py
+records a profile: press a button, type its name. Ships a GameSir
+Cyclone 2 profile seeded from the kernel (DS4 mode) and SDL XInput layouts.
+
+Linux remote and picker resolve names via the profile; plain numbers still
+work. The picker pins SDL to the kernel joystick driver so its numbers
+match the evdev remote.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ README.md                         |  32 ++++
+ controllers/__init__.py           | 140 ++++++++++++++
+ controllers/gamesir_cyclone2.json |  37 ++++
+ linux/config.json                 |  19 +-
+ linux/controller_remote.py        |  47 ++++-
+ linux/mini_config.json            |   3 +-
+ linux/mini_picker.py              |  51 +++++-
+ map_controller.py                 | 291 ++++++++++++++++++++++++++++++
+ 8 files changed, 597 insertions(+), 23 deletions(-)
+ create mode 100644 controllers/__init__.py
+ create mode 100644 controllers/gamesir_cyclone2.json
+ create mode 100644 map_controller.py
+
+diff --git a/README.md b/README.md
+index 0f99721..dbee01f 100644
+--- a/README.md
++++ b/README.md
+@@ -16,6 +16,8 @@ the roster and themes are shared and live at the repo root.
+ ```
+ students.txt         default roster                   (shared)
+ themes/*.json        picker themes                    (shared)
++controllers/*.json   button names per controller      (shared, see below)
++map_controller.py    records a controller profile     (shared)
+ windows/             mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.cmd
+ linux/               mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.sh
+ ```
+@@ -126,6 +128,36 @@ round immediately, and it will not call the same student twice across that
+ boundary. `R` (or pad **X**) still starts a fresh round early if you want one
+ mid-way, but you never need it.
+ 
++## Controller profiles
++
++Button numbers depend on the controller, its mode and the OS, so a number
++that means LB on one setup can be a trigger on another. A profile in
++`controllers/` names them once, and the configs then refer to names:
++
++```json
++"controller_profile": "gamesir_cyclone2",     // linux/config.json
++"bumpers": {"LB": "left", "RB": "right"}
++
++"controller": {"profile": "gamesir_cyclone2", "pick_button": "RB"}   // mini_config.json
++```
++
++Plain numbers still work everywhere. `controllers/gamesir_cyclone2.json` ships
++seeded from the default layouts; if a name lands on the wrong button, record
++what your pad really sends:
++
++```sh
++uv run map_controller.py gamesir_cyclone2   # press a button, type its name (LB, RT, A...)
++uv run map_controller.py                    # new controller: creates controllers/<name>.json
++uv run map_controller.py --show gamesir_cyclone2
++uv run map_controller.py --use gamesir_cyclone2   # point this OS's two configs at it
++```
++
++Each profile has a `linux` and a `windows` section; the mapper writes the one
++for the OS it runs on. Stop `controller_remote.py` while mapping, or pad presses
++also type keys into the terminal. On the Cyclone 2, the numbers change with the
++connection mode and with the M + A face-button swap, so map it in the mode you use.
++The Windows scripts do not read profiles yet.
++
+ ## Where the controller buttons are mapped
+ 
+ Three actions can be driven from the pad — **pick a name**, **change theme**,
+diff --git a/controllers/__init__.py b/controllers/__init__.py
+new file mode 100644
+index 0000000..ea0c4f9
+--- /dev/null
++++ b/controllers/__init__.py
+@@ -0,0 +1,140 @@
++"""
++Controller profiles: one JSON file per controller in this folder, naming the
++pad's buttons and axes so configs can say "LB" instead of a raw number.
++
++    controllers/gamesir_cyclone2.json
++    {
++      "name": "GameSir Cyclone 2",
++      "aliases": {"L1": "LB", ...},          # optional extra names
++      "linux":   {"buttons": {"A": 0, ...}, "axes": {"LX": 0, ...}},
++      "windows": {"buttons": {"A": 0, ...}, "axes": {"LX": 0, ...}}
++    }
++
++Numbers are what pygame reports (on Linux that is also what
++controller_remote.py reads from evdev). They differ per OS, so each OS has
++its own section. Create or fix a profile with map_controller.py at the repo
++root: press a button, type its name.
++
++Configs refer to a profile by its filename without .json, e.g.
++"controller_profile": "gamesir_cyclone2". Button and axis references may then
++be names ("RB") or plain numbers (5); numbers always work, profile or not.
++"""
++
++import json
++import os
++import re
++import sys
++
++CONTROLLERS_DIR = os.path.dirname(os.path.abspath(__file__))
++OS_KEY = "windows" if sys.platform.startswith("win") else "linux"
++
++
++def _norm(name):
++    return str(name).strip().upper()
++
++
++def profile_path(key):
++    return os.path.join(CONTROLLERS_DIR, f"{key}.json")
++
++
++def slugify(text):
++    """'GameSir Cyclone 2' -> 'gamesir_cyclone_2', a safe profile filename."""
++    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_") or "controller"
++
++
++def list_profiles():
++    """Profile keys (filenames without .json) in this folder, sorted."""
++    return sorted(f[:-5] for f in os.listdir(CONTROLLERS_DIR) if f.endswith(".json"))
++
++
++class Profile:
++    """One controller's names -> numbers for the current OS."""
++
++    def __init__(self, key, data):
++        self.key = key
++        self.data = data
++        self.title = data.get("name", key)
++        layout = data.get(OS_KEY, {})
++        self.buttons = {_norm(n): int(i) for n, i in layout.get("buttons", {}).items()}
++        self.axes = {_norm(n): int(i) for n, i in layout.get("axes", {}).items()}
++        self.aliases = {_norm(a): _norm(n) for a, n in data.get("aliases", {}).items()}
++
++    def _lookup(self, table, ref, kind):
++        """Resolve a name or number to a number. None for null; ValueError
++        for a name this profile does not know."""
++        if ref is None or isinstance(ref, int):
++            return ref
++        text = str(ref).strip()
++        if text.lstrip("-").isdigit():
++            return int(text)
++        name = _norm(text)
++        name = name if name in table else self.aliases.get(name, name)
++        if name not in table:
++            raise ValueError(f"{self.key} has no {kind} named {ref!r} "
++                             f"(known: {', '.join(table) or 'none'})")
++        return table[name]
++
++    def button(self, ref):
++        return self._lookup(self.buttons, ref, "button")
++
++    def axis(self, ref):
++        return self._lookup(self.axes, ref, "axis")
++
++    def button_names(self):
++        """{number: name}, the first name wins if two share a number."""
++        out = {}
++        for name, index in self.buttons.items():
++            out.setdefault(index, name)
++        return out
++
++
++class _NoProfile(Profile):
++    """Stands in when no profile is configured: numbers only."""
++
++    def __init__(self):
++        super().__init__(None, {})
++
++
++NO_PROFILE = _NoProfile()
++
++
++def load_profile(key):
++    """The named profile, or NO_PROFILE if key is empty. Raises OSError /
++    ValueError if the file is missing or unreadable."""
++    if not key:
++        return NO_PROFILE
++    with open(profile_path(key), "r", encoding="utf-8") as f:
++        return Profile(key, json.load(f))
++
++
++def load_profile_or_warn(key, warn=print):
++    """load_profile(), falling back to numbers-only with a warning."""
++    try:
++        return load_profile(key)
++    except (OSError, ValueError) as exc:
++        warn(f"[controllers] could not load profile {key!r} ({exc}); using raw numbers")
++        return NO_PROFILE
++
++
++def save_layout(key, buttons, axes, title=None, device=None):
++    """Write this OS's buttons/axes into controllers/<key>.json, keeping the
++    other OS's section, aliases and comments."""
++    path = profile_path(key)
++    data = {}
++    if os.path.exists(path):
++        with open(path, "r", encoding="utf-8") as f:
++            data = json.load(f)
++    data.setdefault("name", title or key)
++    section = data.setdefault(OS_KEY, {})
++    section["_comment"] = "Recorded with map_controller.py" + (
++        f" from '{device['name']}'." if device else ".")
++    section["buttons"] = dict(sorted(buttons.items(), key=lambda kv: kv[1]))
++    section["axes"] = dict(sorted(axes.items(), key=lambda kv: kv[1]))
++    if device:
++        devices = section.setdefault("devices", [])
++        if not any(d.get("name") == device.get("name") for d in devices):
++            devices.append(device)
++    with open(path, "w", encoding="utf-8") as f:
++        json.dump(data, f, indent=2)
++        f.write("\n")
++    return path
+diff --git a/controllers/gamesir_cyclone2.json b/controllers/gamesir_cyclone2.json
+new file mode 100644
+index 0000000..cb6301b
+--- /dev/null
++++ b/controllers/gamesir_cyclone2.json
+@@ -0,0 +1,37 @@
++{
++  "name": "GameSir Cyclone 2",
++  "_comment": "Names are as printed on the pad: A B X Y, LB RB LT RT, VIEW (-), MENU (+), HOME (logo), L3/R3 (stick clicks). The D-pad is a hat on Linux. SHARE, M and the L4/R4 back paddles send nothing of their own - L4/R4 repeat whichever button you program onto them (hold M + L4/R4, press a button). Holding M + A for 2 s swaps A/B and X/Y, and the numbers also change with the connection mode (Home LED: green XInput, red Switch, yellow Android/HID; this pad also shows up as a DS4 'Wireless Controller' over Bluetooth). If presses land on the wrong action, re-run 'uv run map_controller.py gamesir_cyclone2' in the mode you actually use - it rewrites this OS's section from what the pad really sends.",
++  "aliases": {
++    "L1": "LB", "R1": "RB", "L2": "LT", "R2": "RT",
++    "BACK": "VIEW", "SELECT": "VIEW", "MINUS": "VIEW", "-": "VIEW",
++    "START": "MENU", "PLUS": "MENU", "+": "MENU",
++    "GUIDE": "HOME", "LOGO": "HOME",
++    "L-STICK": "L3", "R-STICK": "R3"
++  },
++  "linux": {
++    "_comment": "Seeded from the kernel's order for the DS4-mode device (054c:05c4, hid-playstation): A=BTN_SOUTH, B=EAST, Y=NORTH, X=WEST, then TL TR TL2 TR2 SELECT START MODE THUMBL THUMBR. Overwritten by map_controller.py.",
++    "devices": [
++      {"name": "Wireless Controller", "vendor": "054c", "product": "05c4", "note": "DS4 mode, Bluetooth"}
++    ],
++    "buttons": {
++      "A": 0, "B": 1, "Y": 2, "X": 3,
++      "LB": 4, "RB": 5, "LT": 6, "RT": 7,
++      "VIEW": 8, "MENU": 9, "HOME": 10, "L3": 11, "R3": 12
++    },
++    "axes": {
++      "LX": 0, "LY": 1, "LT": 2, "RX": 3, "RY": 4, "RT": 5
++    }
++  },
++  "windows": {
++    "_comment": "Seeded from SDL's standard XInput layout (the table in the README). The D-pad is buttons 11-14 and the triggers are axes 4/5, not buttons. Unverified on this pad - run map_controller.py on Windows to confirm.",
++    "buttons": {
++      "A": 0, "B": 1, "X": 2, "Y": 3,
++      "VIEW": 4, "HOME": 5, "MENU": 6, "L3": 7, "R3": 8,
++      "LB": 9, "RB": 10,
++      "D-UP": 11, "D-DOWN": 12, "D-LEFT": 13, "D-RIGHT": 14
++    },
++    "axes": {
++      "LX": 0, "LY": 1, "RX": 2, "RY": 3, "LT": 4, "RT": 5
++    }
++  }
++}
+diff --git a/linux/config.json b/linux/config.json
+index dbc3f34..43340ab 100644
+--- a/linux/config.json
++++ b/linux/config.json
+@@ -2,7 +2,8 @@
+   "deadzone": 0.05,
+   "mouse_speed": 70,
+   "poll_hz": 60,
+-  "_comment": "Map raw controller inputs to actions. Action strings are listed in the README. Linux button numbers: 0=A 1=B 2=Y 3=X 4=LB 5=RB 6=LT 7=RT 8=BACK 9=START 10=GUIDE 11=L-STICK 12=R-STICK. The D-pad is the hat; the right stick is axes 3/4 (axis 2 is the LT trigger). Run with --diagnose to print the number of each button as you press it. Run --setup once to calibrate deadzone/axis_max for your controller, and --test to verify the sensitivity zones feel right.",
++  "_comment": "Map controller inputs to actions. Action strings are listed in the README. Buttons and axes are named by controller_profile (controllers/<profile>.json at the repo root) - e.g. \"LB\", \"RT\", \"A\" - so if a name lands on the wrong button, fix the profile once with 'uv run map_controller.py' (press each button, type its name) instead of guessing numbers here. Plain numbers still work. The D-pad is the hat. Run with --diagnose to print each button's number and name as you press it. Run --setup once to calibrate deadzone/axis_max for your controller, and --test to verify the sensitivity zones feel right.",
++  "controller_profile": "gamesir_cyclone2",
+   "axis_max": {
+     "move_x": 1.0,
+     "move_y": 1.0,
+@@ -10,20 +11,22 @@
+     "scroll_y": 1.0
+   },
+   "buttons": {
+-    "0": "click",
+-    "1": "esc",
+-    "2": "f"
++    "A": "click",
++    "B": "esc",
++    "Y": "f"
+   },
+   "bumpers": {
+-    "4": "left",
+-    "5": "right"
++    "LB": "left",
++    "RB": "right"
+   },
+   "hat": {
+     "left": "left",
+     "right": "right"
+   },
+   "axes": {
+-    "move_x": 0,
+-    "move_y": 1
++    "move_x": "LX",
++    "move_y": "LY",
++    "scroll_x": "RX",
++    "scroll_y": "RY"
+   }
+ }
+diff --git a/linux/controller_remote.py b/linux/controller_remote.py
+index ce0c720..2dab231 100644
+--- a/linux/controller_remote.py
++++ b/linux/controller_remote.py
+@@ -21,7 +21,10 @@ Usage:
+     python controller_remote.py --setup    # calibrate deadzone/axis range for your controller
+     python controller_remote.py --test     # live readout of the computed sensitivity zones
+ 
+-Edit linux/config.json to remap inputs. Press Ctrl+C in the terminal to quit.
++Edit linux/config.json to remap inputs. With "controller_profile" set, inputs
++can be named ("LB") rather than numbered; the names come from
++controllers/<profile>.json, which map_controller.py at the repo root records.
++Press Ctrl+C in the terminal to quit.
+ """
+ 
+ import argparse
+@@ -34,8 +37,11 @@ import time
+ import evdev
+ from evdev import ecodes as e
+ 
+-# Each OS folder has its own config.json, next to this script.
++# Each OS folder has its own config.json, next to this script. Controller
++# profiles (button names) are shared, in controllers/ at the repo root.
+ CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import controllers  # noqa: E402
+ 
+ # How often to look for the controller while it is off or disconnected.
+ RECONNECT_SECONDS = 2.0
+@@ -72,9 +78,25 @@ HI_RES_PER_NOTCH = 120
+ def load_config():
+     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+         cfg = json.load(f)
+-    # Normalize json string keys to ints where we index by number.
+-    cfg["buttons"] = {int(k): v for k, v in cfg.get("buttons", {}).items()}
+-    cfg["bumpers"] = {int(k): v for k, v in cfg.get("bumpers", {}).items()}
++    profile = controllers.load_profile_or_warn(cfg.get("controller_profile"))
++    cfg["profile"] = profile
++
++    def resolve(lookup, ref):
++        try:
++            return lookup(ref)
++        except ValueError as exc:
++            print(f"[warn] {exc}")
++            return None
++
++    # Keys may be numbers ("4") or profile names ("LB"); index by number.
++    for section in ("buttons", "bumpers"):
++        resolved = {}
++        for ref, action in cfg.get(section, {}).items():
++            index = resolve(profile.button, ref)
++            if index is not None:
++                resolved[index] = action
++        cfg[section] = resolved
++    cfg["axes"] = {role: resolve(profile.axis, ref) for role, ref in cfg.get("axes", {}).items()}
+     return cfg
+ 
+ 
+@@ -318,8 +340,11 @@ class VirtualInput:
+ 
+ # --- Modes --------------------------------------------------------------------
+ 
+-def diagnose(pad):
+-    """Print every input as it changes so you can find the right numbers."""
++def diagnose(pad, profile):
++    """Print every input as it changes so you can find the right numbers,
++    with the configured profile's name for each one."""
++    names = profile.button_names()
++    axis_names = {i: n for n, i in profile.axes.items()}
+     print("\nDiagnostic mode. Press buttons / move sticks to see their numbers.")
+     print("Press Ctrl+C to quit.\n")
+     last_axis = {}
+@@ -327,14 +352,16 @@ def diagnose(pad):
+         select.select([pad.fd], [], [])
+         for kind, value in pad.read():
+             if kind == "button":
+-                print(f"button {value} pressed ({e.BTN.get(pad.button_codes[value], '?')})")
++                name = f"{names[value]}, " if value in names else ""
++                print(f"button {value} pressed ({name}{e.BTN.get(pad.button_codes[value], '?')})")
+             else:
+                 print(f"hat 0 -> {value}")
+         for i, v in enumerate(pad.axes):
+             # Report each axis once per push past halfway, not on every event.
+             past = v > 0.5 or v < -0.5
+             if past and not last_axis.get(i):
+-                print(f"axis {i} = {v:+.2f}")
++                label = f" ({axis_names[i]})" if i in axis_names else ""
++                print(f"axis {i}{label} = {v:+.2f}")
+             last_axis[i] = past
+ 
+ 
+@@ -546,7 +573,7 @@ def main():
+                 if args.axes:
+                     axis_monitor(pad)
+                 elif args.diagnose:
+-                    diagnose(pad)
++                    diagnose(pad, load_config()["profile"])
+                 elif args.setup:
+                     setup_calibration(pad)
+                 else:
+diff --git a/linux/mini_config.json b/linux/mini_config.json
+index 758846e..7715dc5 100644
+--- a/linux/mini_config.json
++++ b/linux/mini_config.json
+@@ -5,7 +5,8 @@
+   "theme": "vscode",
+   "_theme": "Filename (without .json) of a theme in themes/. T on the keyboard or Y on the pad cycles through them.",
+   "controller": {
+-    "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset / roster - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Linux pad indexes: 0=A 1=B 2=Y 3=X 4=LB 5=RB 6=LT 7=RT 8=BACK 9=START 10=GUIDE 11=L-STICK 12=R-STICK (the D-pad is a hat, not buttons).",
++    "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset / roster - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Buttons can be names from profile (controllers/<profile>.json at the repo root), e.g. \"RB\", or raw numbers; the picker saves names when the profile has one. If a name lands on the wrong button, fix the profile with 'uv run map_controller.py' (press each button, type its name). The D-pad is a hat, not buttons.",
++    "profile": "gamesir_cyclone2",
+     "pick_button": 3,
+     "theme_button": 6,
+     "reset_button": 7,
+diff --git a/linux/mini_picker.py b/linux/mini_picker.py
+index d7f9a9d..32429ef 100644
+--- a/linux/mini_picker.py
++++ b/linux/mini_picker.py
+@@ -69,6 +69,10 @@ WAYLAND = bool(os.environ.get("WAYLAND_DISPLAY"))
+ # picker never has it while you present - you click the slides to drive them,
+ # which is exactly when the pad has to work. This opts into background events.
+ os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
++# Number pad buttons in the kernel's order, as controller_remote.py and
++# map_controller.py do. SDL's HIDAPI drivers would renumber some pads (a DS4
++# among them) as soon as the hidraw node became readable.
++os.environ.setdefault("SDL_JOYSTICK_HIDAPI", "0")
+ # pygame 2.6 bundles SDL 2.28, which defaults to X11 and would run us through
+ # XWayland. Native Wayland gets crisp scaling and proper compositor handling.
+ if WAYLAND:
+@@ -83,6 +87,10 @@ os.environ.setdefault("SDL_VIDEO_ALLOW_SCREENSAVER", "1")
+ import pygame
+ from pygame._sdl2 import video
+ 
++# Controller profiles (button names per pad) live in controllers/ at the repo root.
++sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
++import controllers  # noqa: E402
++
+ # Posted by SIGUSR1 or the X11 hotkey thread to call the next student. They do
+ # nothing but post - picker state belongs to the main loop.
+ HOTKEY_NEXT = pygame.USEREVENT + 1
+@@ -133,7 +141,9 @@ RESIZE_STEP = 1.1         # keyboard / ctrl-wheel zoom per press
+ WINDOW_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
+ 
+ # Pad layout as SDL numbers it on Linux (evdev order), used only to label
+-# buttons in messages. The D-pad is a hat here, not buttons.
++# buttons in messages. The D-pad is a hat here, not buttons. Replaced by the
++# names in controller.profile when one is configured (see apply_profile).
++PROFILE = controllers.NO_PROFILE
+ BUTTON_NAMES = {
+     0: "A", 1: "B", 2: "Y", 3: "X", 4: "LB", 5: "RB", 6: "LT", 7: "RT",
+     8: "BACK", 9: "START", 10: "GUIDE", 11: "L-STICK", 12: "R-STICK",
+@@ -234,13 +244,44 @@ def _merge(base, override):
+ def load_config():
+     """Read mini_config.json, filling in anything missing from the defaults."""
+     if not os.path.exists(CONFIG_PATH):
+-        return dict(DEFAULT_CONFIG)
++        return apply_profile(dict(DEFAULT_CONFIG))
+     try:
+         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+-            return _merge(DEFAULT_CONFIG, json.load(f))
++            return apply_profile(_merge(DEFAULT_CONFIG, json.load(f)))
+     except (OSError, json.JSONDecodeError) as exc:
+         log(f"[mini_picker] could not read mini_config.json ({exc}); using defaults")
+-        return dict(DEFAULT_CONFIG)
++        return apply_profile(dict(DEFAULT_CONFIG))
++
++
++def apply_profile(cfg):
++    """Load controller.profile and turn named buttons ("RB") into numbers.
++
++    The rest of the picker only ever sees numbers; save_config turns them
++    back into names so the file stays readable.
++    """
++    global PROFILE, BUTTON_NAMES
++    pad = cfg["controller"] = dict(cfg["controller"])
++    PROFILE = controllers.load_profile_or_warn(pad.get("profile"), log)
++    if PROFILE.buttons:
++        BUTTON_NAMES = PROFILE.button_names()
++    for key, _prompt, _short in MAPPABLE:
++        try:
++            pad[key] = PROFILE.button(pad.get(key))
++        except ValueError as exc:
++            log(f"[mini_picker] {key}: {exc}")
++            pad[key] = None
++    return cfg
++
++
++def _button_refs(controller):
++    """Copy of the controller section with bound buttons written by name
++    where the profile has one."""
++    names = PROFILE.button_names()
++    out = dict(controller)
++    for key, _prompt, _short in MAPPABLE:
++        if out.get(key) in names:
++            out[key] = names[out[key]]
++    return out
+ 
+ 
+ def save_config(cfg):
+@@ -262,6 +303,8 @@ def save_config(cfg):
+                 merged[key] = value
+         return merged
+ 
++    if "controller" in cfg:
++        cfg = {**cfg, "controller": _button_refs(cfg["controller"])}
+     try:
+         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+             json.dump(blend(on_disk, cfg), f, indent=2)
+diff --git a/map_controller.py b/map_controller.py
+new file mode 100644
+index 0000000..1152a91
+--- /dev/null
++++ b/map_controller.py
+@@ -0,0 +1,291 @@
++"""
++Map a controller's buttons by pressing them.
++
++Press a button (or pull a trigger, push a stick) and type what is printed on
++it - "LB", "RT", "A". The names are saved to controllers/<profile>.json for
++this OS, and the configs can then say "LB" instead of a number that turns out
++to belong to some other button.
++
++Usage:
++    uv run map_controller.py                    # map the connected pad, pick/create a profile
++    uv run map_controller.py gamesir_cyclone2   # (re)map that profile
++    uv run map_controller.py --list             # show the profiles in controllers/
++    uv run map_controller.py --show gamesir_cyclone2
++    uv run map_controller.py --use gamesir_cyclone2   # point this OS's configs at a profile
++
++While mapping: an empty name skips that input, "q" finishes, Ctrl+C finishes
++too. Nothing is written until you confirm at the end.
++
++Numbers come from pygame, the same as the picker; on Linux pygame is told to
++use the kernel driver so they also match controller_remote.py.
++"""
++
++import argparse
++import json
++import os
++import sys
++import time
++
++import controllers
++from controllers import OS_KEY
++
++# Same order as controller_remote.py's evdev numbering on Linux, rather than
++# SDL's HIDAPI drivers, which number some pads differently.
++if OS_KEY == "linux":
++    os.environ.setdefault("SDL_JOYSTICK_HIDAPI", "0")
++os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
++os.environ.setdefault("SDL_VIDEODRIVER", "dummy")  # no window needed
++os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
++
++import pygame  # noqa: E402  (after the SDL hints above)
++
++ROOT = os.path.dirname(os.path.abspath(__file__))
++OS_DIR = os.path.join(ROOT, OS_KEY)
++REMOTE_CONFIG = os.path.join(OS_DIR, "config.json")
++PICKER_CONFIG = os.path.join(OS_DIR, "mini_config.json")
++
++AXIS_TRIGGER = 0.6     # how far an axis must move from rest to count
++SETTLE_SECONDS = 0.25  # gather the burst one press makes (LT = button + axis)
++SUGGESTED = "A B X Y LB RB LT RT VIEW MENU HOME L3 R3 | sticks: LX LY RX RY"
++
++
++def ask(prompt, default=""):
++    try:
++        reply = input(prompt).strip()
++    except EOFError:
++        return default
++    return reply or default
++
++
++def yes(prompt, default=True):
++    reply = ask(f"{prompt} [{'Y/n' if default else 'y/N'}] ").lower()
++    return default if not reply else reply.startswith("y")
++
++
++def open_pad(index):
++    pygame.init()
++    pygame.joystick.init()
++    if pygame.joystick.get_count() == 0:
++        print("No controller detected - waiting (Ctrl+C to quit)...")
++        while pygame.joystick.get_count() == 0:
++            pygame.event.pump()
++            time.sleep(0.5)
++            pygame.joystick.quit()
++            pygame.joystick.init()
++    if index >= pygame.joystick.get_count():
++        sys.exit(f"Only {pygame.joystick.get_count()} controller(s) connected; no joystick {index}.")
++    pad = pygame.joystick.Joystick(index)
++    pad.init()
++    return pad
++
++
++def device_info(pad):
++    info = {"name": pad.get_name(), "guid": pad.get_guid()}
++    print(f"Controller: {info['name']}  buttons={pad.get_numbuttons()} "
++          f"axes={pad.get_numaxes()} hats={pad.get_numhats()}")
++    return info
++
++
++def rest_values(pad):
++    """Each axis's idle value (triggers rest at -1, sticks near 0)."""
++    for _ in range(10):
++        pygame.event.pump()
++        time.sleep(0.02)
++    return [pad.get_axis(i) for i in range(pad.get_numaxes())]
++
++
++def wait_for_input(pad, rest):
++    """Block until the pad does something. Returns (buttons, axes, hat_seen)
++    collected over a short window, so a trigger that sends both a button and
++    an axis comes back as one press."""
++    pygame.event.clear()
++    buttons, axes, hat = [], [], False
++    deadline = None
++    while deadline is None or time.monotonic() < deadline:
++        for ev in pygame.event.get():
++            if ev.type == pygame.JOYBUTTONDOWN and ev.button not in buttons:
++                buttons.append(ev.button)
++            elif ev.type == pygame.JOYAXISMOTION and ev.axis < len(rest) \
++                    and abs(ev.value - rest[ev.axis]) > AXIS_TRIGGER and ev.axis not in axes:
++                axes.append(ev.axis)
++            elif ev.type == pygame.JOYHATMOTION and ev.value != (0, 0):
++                hat = True
++            else:
++                continue
++            if deadline is None:
++                deadline = time.monotonic() + SETTLE_SECONDS
++        time.sleep(0.01)
++    return buttons, axes, hat
++
++
++def wait_for_release(pad, rest):
++    """Let go of everything before the next prompt, so a held stick does
++    not immediately count as the next input."""
++    while True:
++        pygame.event.pump()
++        held = any(pad.get_button(i) for i in range(pad.get_numbuttons()))
++        held = held or any(abs(pad.get_axis(i) - rest[i]) > AXIS_TRIGGER / 2
++                           for i in range(len(rest)))
++        if not held:
++            return
++        time.sleep(0.02)
++
++
++def assign(table, name, index):
++    """name -> index, dropping any other name that pointed at index."""
++    for other in [n for n, i in table.items() if i == index and n != name]:
++        del table[other]
++    table[name] = index
++
++
++def describe(table, index):
++    names = [n for n, i in table.items() if i == index]
++    return f" (now {'/'.join(names)})" if names else ""
++
++
++def map_session(pad, buttons, axes):
++    rest = rest_values(pad)
++    print(f"\nPress a button, pull a trigger or push a stick, then type its name.")
++    print(f"Suggested names: {SUGGESTED}")
++    print("Enter on an empty name skips it, 'q' finishes, Ctrl+C finishes.\n")
++    hat_noted = False
++    try:
++        while True:
++            print("Waiting for the pad...", end="", flush=True)
++            pressed, moved, hat = wait_for_input(pad, rest)
++            print("\r" + " " * 24 + "\r", end="")
++            if hat and not pressed and not moved:
++                if not hat_noted:
++                    print("D-pad: that is a hat (directions, not buttons) - nothing to name.")
++                    hat_noted = True
++                wait_for_release(pad, rest)
++                continue
++            parts = [f"button {b}{describe(buttons, b)}" for b in pressed]
++            parts += [f"axis {a}{describe(axes, a)}" for a in moved]
++            name = ask(f"{' + '.join(parts)} -> name: ")
++            if name.lower() == "q":
++                break
++            if name:
++                name = name.upper()
++                for b in pressed:
++                    assign(buttons, name, b)
++                for a in moved:
++                    assign(axes, name, a)
++                print(f"  saved {name}")
++            wait_for_release(pad, rest)
++    except KeyboardInterrupt:
++        print()
++
++
++def print_layout(buttons, axes):
++    print("  buttons: " + ("  ".join(f"{n}={i}" for n, i in sorted(buttons.items(), key=lambda kv: kv[1])) or "none"))
++    print("  axes:    " + ("  ".join(f"{n}={i}" for n, i in sorted(axes.items(), key=lambda kv: kv[1])) or "none"))
++
++
++def edit_json(path, change):
++    """Read-modify-write a config, keeping its other keys and comments."""
++    with open(path, "r", encoding="utf-8") as f:
++        cfg = json.load(f)
++    change(cfg)
++    with open(path, "w", encoding="utf-8") as f:
++        json.dump(cfg, f, indent=2)
++        f.write("\n")
++
++
++def use_profile(key):
++    """Point this OS's remote and picker configs at the profile."""
++    controllers.load_profile(key)  # fail loudly on a typo before writing anything
++    done = []
++    if os.path.exists(REMOTE_CONFIG):
++        edit_json(REMOTE_CONFIG, lambda cfg: cfg.__setitem__("controller_profile", key))
++        done.append(os.path.relpath(REMOTE_CONFIG, ROOT))
++    if os.path.exists(PICKER_CONFIG):
++        edit_json(PICKER_CONFIG, lambda cfg: cfg.setdefault("controller", {}).__setitem__("profile", key))
++        done.append(os.path.relpath(PICKER_CONFIG, ROOT))
++    print(f"Using {key} in: {', '.join(done) or 'no configs found'}")
++
++
++def current_profile_key():
++    """The profile this OS's configs already use, if any."""
++    for path, get in ((REMOTE_CONFIG, lambda c: c.get("controller_profile")),
++                      (PICKER_CONFIG, lambda c: c.get("controller", {}).get("profile"))):
++        try:
++            with open(path, "r", encoding="utf-8") as f:
++                key = get(json.load(f))
++        except (OSError, ValueError):
++            continue
++        if key:
++            return key
++    return None
++
++
++def main():
++    parser = argparse.ArgumentParser(description="Map controller buttons to names, saved in controllers/")
++    parser.add_argument("profile", nargs="?", help="profile name (file in controllers/ without .json)")
++    parser.add_argument("--list", action="store_true", help="list the profiles in controllers/")
++    parser.add_argument("--show", metavar="PROFILE", help="print a profile's layout for this OS")
++    parser.add_argument("--use", metavar="PROFILE", help="point this OS's configs at PROFILE")
++    parser.add_argument("--joystick", type=int, default=0, help="which pad, if several are connected")
++    args = parser.parse_args()
++
++    if args.list:
++        for key in controllers.list_profiles():
++            print(f"{key:24} {controllers.load_profile(key).title}")
++        return
++    if args.show:
++        p = controllers.load_profile(args.show)
++        print(f"{p.title} ({OS_KEY}):")
++        print_layout(p.buttons, p.axes)
++        return
++    if args.use:
++        use_profile(args.use)
++        return
++
++    if OS_KEY == "linux" and os.system("pgrep -f controller_remote.py >/dev/null 2>&1") == 0:
++        print("Note: controller_remote.py is running, so pad presses will also type keys here.")
++        print("      Stop it (Ctrl+C in its terminal) for a cleaner mapping session.\n")
++
++    pad = open_pad(args.joystick)
++    device = device_info(pad)
++
++    key = args.profile
++    if not key:
++        existing = controllers.list_profiles()
++        default = current_profile_key() or controllers.slugify(device["name"])
++        print(f"Profiles in controllers/: {', '.join(existing) or 'none yet'}")
++        key = controllers.slugify(ask(f"Profile to map [{default}]: ", default))
++
++    try:
++        profile = controllers.load_profile(key)
++        print(f"Updating {profile.title} ({key}.json), {OS_KEY} section. Current:")
++        print_layout(profile.buttons, profile.axes)
++        title = None
++    except OSError:
++        print(f"New profile controllers/{key}.json")
++        profile = controllers.Profile(key, {})
++        title = ask(f"Controller name [{device['name']}]: ", device["name"])
++
++    buttons, axes = dict(profile.buttons), dict(profile.axes)
++    map_session(pad, buttons, axes)
++
++    print("\nResult:")
++    print_layout(buttons, axes)
++    if (buttons, axes) == (profile.buttons, profile.axes):
++        print("No changes.")
++    elif yes(f"Save to controllers/{key}.json?"):
++        path = controllers.save_layout(key, buttons, axes, title=title,
++                                       device={"name": device["name"]})
++        print(f"Saved {os.path.relpath(path, ROOT)}")
++    else:
++        print("Not saved.")
++        return
++
++    if current_profile_key() != key and yes(f"Use {key} in {OS_KEY}/config.json and {OS_KEY}/mini_config.json?"):
++        use_profile(key)
++
++
++if __name__ == "__main__":
++    try:
++        main()
++    except KeyboardInterrupt:
++        print("\nExiting.")
+-- 
+2.55.0
+

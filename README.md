@@ -10,21 +10,20 @@ management.
 
 ## Layout
 
-The code is split per operating system; everything you edit is shared and
-lives at the repo root.
+The code is split per operating system. Each OS folder has its own configs;
+the roster and themes are shared and live at the repo root.
 
 ```
-config.json          controller remote mapping        (shared)
-mini_config.json     picker settings                  (shared)
 students.txt         default roster                   (shared)
 themes/*.json        picker themes                    (shared)
-windows/             mini_picker.py, controller_remote.py, run_picker.cmd
-linux/               mini_picker.py, controller_remote.py, run_picker.sh
+windows/             mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.cmd
+linux/               mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.sh
 ```
 
-Both versions read the configs, roster and themes from the repo root, so a
-change there applies on either OS. Commands below use `windows/`; swap in
-`linux/` on Linux.
+`mini_config.json` (picker) and `config.json` (controller remote) are per OS
+because pad button numbers, roster paths and
+window placement differ between Windows and Linux. Commands below use
+`windows/`; swap in `linux/` on Linux.
 
 ## Setup
 
@@ -153,7 +152,7 @@ Press `H` any time to see that summary again. A button already used by an
 action you set earlier in the same run is refused (`Y (3) is already Pick — try
 another`) rather than silently taken away from it.
 
-### 2. In `mini_config.json` (by hand)
+### 2. In `windows/mini_config.json` or `linux/mini_config.json` (by hand)
 
 ```json
 "controller": {
@@ -165,7 +164,8 @@ another`) rather than silently taken away from it.
 ```
 
 `null` leaves an action unmapped. `joystick_index` picks which pad to listen to
-if you have more than one plugged in. The standard SDL button numbers are:
+if you have more than one plugged in. The standard SDL button numbers on
+Windows are:
 
 | # | Button | # | Button | # | Button |
 | --- | --- | --- | --- | --- | --- |
@@ -175,17 +175,28 @@ if you have more than one plugged in. The standard SDL button numbers are:
 | 3 | Y | 8 | Right stick | 13 | D-pad left |
 | 4 | BACK | 9 | LB | 14 | D-pad right |
 
+On Linux the numbers follow the kernel's order, and the D-pad is a hat rather
+than buttons:
+
+| # | Button | # | Button | # | Button |
+| --- | --- | --- | --- | --- | --- |
+| 0 | A | 5 | RB | 10 | GUIDE |
+| 1 | B | 6 | LT | 11 | Left stick |
+| 2 | Y | 7 | RT | 12 | Right stick |
+| 3 | X | 8 | BACK | | |
+| 4 | LB | 9 | START | | |
+
 Numbers can differ between controllers. If yours does not match, use `L` — it
 reads whatever your pad actually sends — or run
 `uv run windows/controller_remote.py --diagnose` to print the index of each button as
 you press it.
 
-Note that `controller_remote.py` has its own separate mapping in `config.json`;
+Note that `controller_remote.py` has its own separate mapping in its folder's `config.json`;
 the two are unrelated.
 
 ## mini_config.json
 
-Behavior — which roster, which buttons, where the window sits
+One per OS: `windows/mini_config.json` and `linux/mini_config.json`. Behavior — which roster, which buttons, where the window sits
 (see [button mapping](#where-the-controller-buttons-are-mapped) above):
 
 | Key | Meaning |
@@ -195,6 +206,7 @@ Behavior — which roster, which buttons, where the window sits
 | `controller.pick_button` | Button that draws a name. |
 | `controller.theme_button` | Button that cycles to the next theme. |
 | `controller.reset_button` | Button that resets the pool; `null` to disable. |
+| `controller.roster_button` | Linux only: button that opens the roster file dialog, like `F`. |
 | `controller.joystick_index` | Which pad to listen to, if several are plugged in. |
 | `window.x` / `window.y` | Saved screen position; `null` centers the window. |
 | `window.width` / `window.height` | Saved window size; `null` uses the theme's design size. |
@@ -392,8 +404,7 @@ Linux-specific behavior:
 - **Size.** A size the compositor hands the window (tiling, a super-drag
   resize) is followed but not saved. Only `+` / `-` / `0` / `Ctrl`+wheel write
   `window.width` / `window.height`. `window.x`, `window.y` and
-  `window.always_on_top` are left alone for the Windows version, which shares
-  `mini_config.json`.
+  `window.always_on_top` are not used on Linux.
 - **Global NEXT.** Wayland does not let apps watch the keyboard, so the
   `hotkey` setting only works under X11. Instead, the picker calls the next
   student when it gets `SIGUSR1`. The process is named `student-picker`, so
@@ -417,6 +428,25 @@ Linux-specific behavior:
   freezing the picker.
 - **Quitting.** `SIGTERM` (`pkill -x student-picker`) quits cleanly and
   saves settings, the same as `Esc`.
+
+`linux/controller_remote.py` reads the pad through evdev and types through a
+virtual uinput keyboard and mouse (`controller-remote keyboard` /
+`controller-remote mouse`), so native Wayland apps receive it too:
+
+- **Numbers.** Button and axis numbers match what pygame reports on Linux,
+  which is not the same as Windows. The right stick is axes 3/4 (axis 2 is
+  the L2 trigger), and the D-pad is a hat. With no `"hat"` entry in
+  `linux/config.json`, D-pad left/right send the left/right arrow keys. Run
+  `uv run linux/controller_remote.py --diagnose` to see your numbers.
+- **Waiting.** If the controller is off, or its Bluetooth link drops, the
+  remote waits and picks it up again when it comes back.
+- **CPU.** It sleeps until the pad sends input. It only runs a `poll_hz`
+  loop while a stick is held.
+- **Speed.** Hyprland's pointer acceleration applies to the virtual mouse.
+  Tune `mouse_speed`, or set a per-device `sensitivity` / `accel_profile`
+  for `controller-remote-mouse`.
+- **Permissions.** Your user needs write access to `/dev/uinput`. If the
+  remote says it cannot open it, it prints the udev rule to add.
 
 ## Students list
 

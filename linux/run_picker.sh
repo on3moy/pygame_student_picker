@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Start everything a lecture needs on Linux: the student picker, and the
 # controller remote that turns D-pad presses into the arrow keys your slides
-# listen for. The scripts live in this linux/ folder; their configs, the roster
-# and the themes are shared and live at the repo root.
+# listen for. The scripts and their configs live in this linux/ folder; the
+# roster and the themes are shared at the repo root.
 #
-#   linux/mini_picker.py       + mini_config.json   the picker
-#   linux/controller_remote.py + config.json        the slide remote
+#   linux/mini_picker.py       + linux/mini_config.json   the picker
+#   linux/controller_remote.py + linux/config.json        the slide remote
 #
-# Run "uv sync" once at the repo root first so .venv exists. Turn the
-# controller on BEFORE launching - the remote exits if it cannot find a pad at
-# startup. Extra arguments are passed to the picker.
+# Run "uv sync" once at the repo root first so .venv exists. The remote waits
+# for the controller if it is off, and reconnects if it drops. Extra arguments
+# are passed to the picker.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,5 +34,5 @@ if [[ ! -f "$HERE/controller_remote.py" ]]; then
 fi
 
 # The remote stays in the foreground: this terminal is where it reports things
-# like "No controller detected", and Ctrl+C here stops it.
+# like "Controller disconnected", and Ctrl+C here stops it.
 exec "$PY" "$HERE/controller_remote.py"
