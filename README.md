@@ -16,6 +16,8 @@ the roster and themes are shared and live at the repo root.
 ```
 students.txt         default roster                   (shared)
 themes/*.json        picker themes                    (shared)
+controllers/*.json   button names per controller      (shared, see below)
+map_controller.py    records a controller profile     (shared)
 windows/             mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.cmd
 linux/               mini_picker.py, mini_config.json, controller_remote.py, config.json, run_picker.sh
 ```
@@ -126,6 +128,43 @@ round immediately, and it will not call the same student twice across that
 boundary. `R` (or pad **X**) still starts a fresh round early if you want one
 mid-way, but you never need it.
 
+## Controller profiles
+
+Button numbers depend on the controller, its mode and the OS, so a number
+that means LB on one setup can be a trigger on another. A profile in
+`controllers/` names them once, and the configs then refer to names:
+
+```json
+"controller_profile": "gamesir_cyclone2",     // linux/config.json
+"bumpers": {"LB": "left", "RB": "right"}
+
+"controller": {"profile": "gamesir_cyclone2", "pick_button": "RB"}   // mini_config.json
+```
+
+Plain numbers still work everywhere. `controllers/gamesir_cyclone2.json` ships
+seeded from the default layouts; if a name lands on the wrong button, record
+what your pad really sends:
+
+```sh
+uv run map_controller.py gamesir_cyclone2   # guided: "Press LB - left bumper", you press it
+uv run map_controller.py --free gamesir_cyclone2   # press anything, then type its name
+uv run map_controller.py                    # new controller: creates controllers/<name>.json
+uv run map_controller.py --show gamesir_cyclone2
+uv run map_controller.py --use gamesir_cyclone2   # point this OS's two configs at it
+```
+
+The standard names are `A B X Y LB RB LT RT VIEW MENU HOME L3 R3` for buttons
+and `LX LY RX RY` for the sticks (defined in `controllers/__init__.py`). Guided
+mode asks for exactly these, so you never type one. `--free` accepts them and
+common aliases (`L1` → `LB`, `START` → `MENU`), and asks before keeping
+anything else as a custom name.
+
+Each profile has a `linux` and a `windows` section; the mapper writes the one
+for the OS it runs on. Stop `controller_remote.py` while mapping, or pad presses
+also type keys into the terminal. On the Cyclone 2, the numbers change with the
+connection mode and with the M + A face-button swap, so map it in the mode you use.
+The Windows scripts do not read profiles yet.
+
 ## Where the controller buttons are mapped
 
 Three actions can be driven from the pad — **pick a name**, **change theme**,
@@ -153,6 +192,24 @@ action you set earlier in the same run is refused (`Y (3) is already Pick — tr
 another`) rather than silently taken away from it.
 
 ### 2. In `windows/mini_config.json` or `linux/mini_config.json` (by hand)
+
+On Linux, buttons are written by name and the
+[controller profile](#controller-profiles) turns each one into a number:
+
+```json
+"controller": {
+  "profile": "gamesir_cyclone2",
+  "pick_button": "X",
+  "theme_button": "LT",
+  "reset_button": "RT",
+  "roster_button": "MENU",
+  "joystick_index": 0
+}
+```
+
+Names: `A B X Y LB RB LT RT VIEW MENU HOME L3 R3`. The picker writes names back
+when you rebind with `L`. The Windows picker does not read profiles yet, so
+`windows/mini_config.json` still uses numbers:
 
 ```json
 "controller": {

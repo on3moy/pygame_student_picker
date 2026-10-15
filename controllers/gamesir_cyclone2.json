@@ -1,0 +1,34 @@
+{
+  "name": "GameSir Cyclone 2",
+  "_comment": "Names are as printed on the pad: A B X Y, LB RB LT RT, VIEW (-), MENU (+), HOME (logo), L3/R3 (stick clicks). The D-pad is a hat on Linux. SHARE, M and the L4/R4 back paddles send nothing of their own - L4/R4 repeat whichever button you program onto them (hold M + L4/R4, press a button). Holding M + A for 2 s swaps A/B and X/Y, and the numbers also change with the connection mode (Home LED: green XInput, red Switch, yellow Android/HID; this pad also shows up as a DS4 'Wireless Controller' over Bluetooth). If presses land on the wrong action, re-run 'uv run map_controller.py gamesir_cyclone2' in the mode you actually use - it rewrites this OS's section from what the pad really sends.",
+  "_aliases": "Extra names on top of the standard ones in controllers/__init__.py (L1=LB, START=MENU, ...).",
+  "aliases": {
+    "MINUS": "VIEW", "-": "VIEW", "PLUS": "MENU", "+": "MENU", "LOGO": "HOME"
+  },
+  "linux": {
+    "_comment": "Seeded from the kernel's order for the DS4-mode device (054c:05c4, hid-playstation): A=BTN_SOUTH, B=EAST, Y=NORTH, X=WEST, then TL TR TL2 TR2 SELECT START MODE THUMBL THUMBR. Overwritten by map_controller.py.",
+    "devices": [
+      {"name": "Wireless Controller", "vendor": "054c", "product": "05c4", "note": "DS4 mode, Bluetooth"}
+    ],
+    "buttons": {
+      "A": 0, "B": 1, "Y": 2, "X": 3,
+      "LB": 4, "RB": 5, "LT": 6, "RT": 7,
+      "VIEW": 8, "MENU": 9, "HOME": 10, "L3": 11, "R3": 12
+    },
+    "axes": {
+      "LX": 0, "LY": 1, "LT": 2, "RX": 3, "RY": 4, "RT": 5
+    }
+  },
+  "windows": {
+    "_comment": "Seeded from SDL's standard XInput layout (the table in the README). The D-pad is buttons 11-14 and the triggers are axes 4/5, not buttons. Unverified on this pad - run map_controller.py on Windows to confirm.",
+    "buttons": {
+      "A": 0, "B": 1, "X": 2, "Y": 3,
+      "VIEW": 4, "HOME": 5, "MENU": 6, "L3": 7, "R3": 8,
+      "LB": 9, "RB": 10,
+      "D-UP": 11, "D-DOWN": 12, "D-LEFT": 13, "D-RIGHT": 14
+    },
+    "axes": {
+      "LX": 0, "LY": 1, "RX": 2, "RY": 3, "LT": 4, "RT": 5
+    }
+  }
+}

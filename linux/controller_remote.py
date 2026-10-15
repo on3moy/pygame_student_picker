@@ -21,7 +21,10 @@ Usage:
     python controller_remote.py --setup    # calibrate deadzone/axis range for your controller
     python controller_remote.py --test     # live readout of the computed sensitivity zones
 
-Edit linux/config.json to remap inputs. Press Ctrl+C in the terminal to quit.
+Edit linux/config.json to remap inputs. With "controller_profile" set, inputs
+can be named ("LB") rather than numbered; the names come from
+controllers/<profile>.json, which map_controller.py at the repo root records.
+Press Ctrl+C in the terminal to quit.
 """
 
 import argparse
@@ -34,8 +37,11 @@ import time
 import evdev
 from evdev import ecodes as e
 
-# Each OS folder has its own config.json, next to this script.
+# Each OS folder has its own config.json, next to this script. Controller
+# profiles (button names) are shared, in controllers/ at the repo root.
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import controllers  # noqa: E402
 
 # How often to look for the controller while it is off or disconnected.
 RECONNECT_SECONDS = 2.0
@@ -72,9 +78,25 @@ HI_RES_PER_NOTCH = 120
 def load_config():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
-    # Normalize json string keys to ints where we index by number.
-    cfg["buttons"] = {int(k): v for k, v in cfg.get("buttons", {}).items()}
-    cfg["bumpers"] = {int(k): v for k, v in cfg.get("bumpers", {}).items()}
+    profile = controllers.load_profile_or_warn(cfg.get("controller_profile"))
+    cfg["profile"] = profile
+
+    def resolve(lookup, ref):
+        try:
+            return lookup(ref)
+        except ValueError as exc:
+            print(f"[warn] {exc}")
+            return None
+
+    # Keys may be numbers ("4") or profile names ("LB"); index by number.
+    for section in ("buttons", "bumpers"):
+        resolved = {}
+        for ref, action in cfg.get(section, {}).items():
+            index = resolve(profile.button, ref)
+            if index is not None:
+                resolved[index] = action
+        cfg[section] = resolved
+    cfg["axes"] = {role: resolve(profile.axis, ref) for role, ref in cfg.get("axes", {}).items()}
     return cfg
 
 
@@ -318,8 +340,11 @@ class VirtualInput:
 
 # --- Modes --------------------------------------------------------------------
 
-def diagnose(pad):
-    """Print every input as it changes so you can find the right numbers."""
+def diagnose(pad, profile):
+    """Print every input as it changes so you can find the right numbers,
+    with the configured profile's name for each one."""
+    names = profile.button_names()
+    axis_names = {i: n for n, i in profile.axes.items()}
     print("\nDiagnostic mode. Press buttons / move sticks to see their numbers.")
     print("Press Ctrl+C to quit.\n")
     last_axis = {}
@@ -327,14 +352,16 @@ def diagnose(pad):
         select.select([pad.fd], [], [])
         for kind, value in pad.read():
             if kind == "button":
-                print(f"button {value} pressed ({e.BTN.get(pad.button_codes[value], '?')})")
+                name = f"{names[value]}, " if value in names else ""
+                print(f"button {value} pressed ({name}{e.BTN.get(pad.button_codes[value], '?')})")
             else:
                 print(f"hat 0 -> {value}")
         for i, v in enumerate(pad.axes):
             # Report each axis once per push past halfway, not on every event.
             past = v > 0.5 or v < -0.5
             if past and not last_axis.get(i):
-                print(f"axis {i} = {v:+.2f}")
+                label = f" ({axis_names[i]})" if i in axis_names else ""
+                print(f"axis {i}{label} = {v:+.2f}")
             last_axis[i] = past
 
 
@@ -546,7 +573,7 @@ def main():
                 if args.axes:
                     axis_monitor(pad)
                 elif args.diagnose:
-                    diagnose(pad)
+                    diagnose(pad, load_config()["profile"])
                 elif args.setup:
                     setup_calibration(pad)
                 else:

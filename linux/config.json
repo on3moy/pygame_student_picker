@@ -2,7 +2,8 @@
   "deadzone": 0.05,
   "mouse_speed": 70,
   "poll_hz": 60,
-  "_comment": "Map raw controller inputs to actions. Action strings are listed in the README. Linux button numbers: 0=A 1=B 2=Y 3=X 4=LB 5=RB 6=LT 7=RT 8=BACK 9=START 10=GUIDE 11=L-STICK 12=R-STICK. The D-pad is the hat; the right stick is axes 3/4 (axis 2 is the LT trigger). Run with --diagnose to print the number of each button as you press it. Run --setup once to calibrate deadzone/axis_max for your controller, and --test to verify the sensitivity zones feel right.",
+  "_comment": "Map controller inputs to actions. Action strings are listed in the README. Buttons are names: A B X Y LB RB LT RT VIEW MENU HOME L3 R3 (aliases like L1 or START work too). Axes are LX LY (left stick) and RX RY (right stick). controller_profile (controllers/<profile>.json at the repo root) turns each name into the number your pad sends - if a name lands on the wrong button, fix the profile with 'uv run map_controller.py' rather than guessing numbers here. Plain numbers still work. The D-pad is the hat. Run with --diagnose to print each button's number and name as you press it. Run --setup once to calibrate deadzone/axis_max for your controller, and --test to verify the sensitivity zones feel right.",
+  "controller_profile": "gamesir_cyclone2",
   "axis_max": {
     "move_x": 1.0,
     "move_y": 1.0,
@@ -10,20 +11,22 @@
     "scroll_y": 1.0
   },
   "buttons": {
-    "0": "click",
-    "1": "esc",
-    "2": "f"
+    "A": "click",
+    "B": "esc",
+    "Y": "f"
   },
   "bumpers": {
-    "4": "left",
-    "5": "right"
+    "LB": "left",
+    "RB": "right"
   },
   "hat": {
     "left": "left",
     "right": "right"
   },
   "axes": {
-    "move_x": 0,
-    "move_y": 1
+    "move_x": "LX",
+    "move_y": "LY",
+    "scroll_x": "RX",
+    "scroll_y": "RY"
   }
 }

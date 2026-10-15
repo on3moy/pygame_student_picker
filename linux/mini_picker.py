@@ -69,6 +69,10 @@ WAYLAND = bool(os.environ.get("WAYLAND_DISPLAY"))
 # picker never has it while you present - you click the slides to drive them,
 # which is exactly when the pad has to work. This opts into background events.
 os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
+# Number pad buttons in the kernel's order, as controller_remote.py and
+# map_controller.py do. SDL's HIDAPI drivers would renumber some pads (a DS4
+# among them) as soon as the hidraw node became readable.
+os.environ.setdefault("SDL_JOYSTICK_HIDAPI", "0")
 # pygame 2.6 bundles SDL 2.28, which defaults to X11 and would run us through
 # XWayland. Native Wayland gets crisp scaling and proper compositor handling.
 if WAYLAND:
@@ -82,6 +86,10 @@ os.environ.setdefault("SDL_VIDEO_ALLOW_SCREENSAVER", "1")
 
 import pygame
 from pygame._sdl2 import video
+
+# Controller profiles (button names per pad) live in controllers/ at the repo root.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import controllers  # noqa: E402
 
 # Posted by SIGUSR1 or the X11 hotkey thread to call the next student. They do
 # nothing but post - picker state belongs to the main loop.
@@ -133,7 +141,9 @@ RESIZE_STEP = 1.1         # keyboard / ctrl-wheel zoom per press
 WINDOW_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
 
 # Pad layout as SDL numbers it on Linux (evdev order), used only to label
-# buttons in messages. The D-pad is a hat here, not buttons.
+# buttons in messages. The D-pad is a hat here, not buttons. Replaced by the
+# names in controller.profile when one is configured (see apply_profile).
+PROFILE = controllers.NO_PROFILE
 BUTTON_NAMES = {
     0: "A", 1: "B", 2: "Y", 3: "X", 4: "LB", 5: "RB", 6: "LT", 7: "RT",
     8: "BACK", 9: "START", 10: "GUIDE", 11: "L-STICK", 12: "R-STICK",
@@ -234,13 +244,44 @@ def _merge(base, override):
 def load_config():
     """Read mini_config.json, filling in anything missing from the defaults."""
     if not os.path.exists(CONFIG_PATH):
-        return dict(DEFAULT_CONFIG)
+        return apply_profile(dict(DEFAULT_CONFIG))
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            return _merge(DEFAULT_CONFIG, json.load(f))
+            return apply_profile(_merge(DEFAULT_CONFIG, json.load(f)))
     except (OSError, json.JSONDecodeError) as exc:
         log(f"[mini_picker] could not read mini_config.json ({exc}); using defaults")
-        return dict(DEFAULT_CONFIG)
+        return apply_profile(dict(DEFAULT_CONFIG))
+
+
+def apply_profile(cfg):
+    """Load controller.profile and turn named buttons ("RB") into numbers.
+
+    The rest of the picker only ever sees numbers; save_config turns them
+    back into names so the file stays readable.
+    """
+    global PROFILE, BUTTON_NAMES
+    pad = cfg["controller"] = dict(cfg["controller"])
+    PROFILE = controllers.load_profile_or_warn(pad.get("profile"), log)
+    if PROFILE.buttons:
+        BUTTON_NAMES = PROFILE.button_names()
+    for key, _prompt, _short in MAPPABLE:
+        try:
+            pad[key] = PROFILE.button(pad.get(key))
+        except ValueError as exc:
+            log(f"[mini_picker] {key}: {exc}")
+            pad[key] = None
+    return cfg
+
+
+def _button_refs(controller):
+    """Copy of the controller section with bound buttons written by name
+    where the profile has one."""
+    names = PROFILE.button_names()
+    out = dict(controller)
+    for key, _prompt, _short in MAPPABLE:
+        if out.get(key) in names:
+            out[key] = names[out[key]]
+    return out
 
 
 def save_config(cfg):
@@ -262,6 +303,8 @@ def save_config(cfg):
                 merged[key] = value
         return merged
 
+    if "controller" in cfg:
+        cfg = {**cfg, "controller": _button_refs(cfg["controller"])}
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(blend(on_disk, cfg), f, indent=2)
