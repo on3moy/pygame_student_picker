@@ -5,10 +5,11 @@
   "theme": "vscode",
   "_theme": "Filename (without .json) of a theme in themes/. T on the keyboard or Y on the pad cycles through them.",
   "controller": {
-    "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Standard pad indexes: 0=A 1=B 2=X 3=Y 4=BACK 6=START 7=L-STICK 8=R-STICK 9=LB 10=RB 11-14=D-PAD.",
-    "pick_button": 10,
-    "theme_button": 9,
-    "reset_button": 2,
+    "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Buttons are names: A B X Y LB RB LT RT VIEW MENU HOME L3 R3, D-UP D-DOWN D-LEFT D-RIGHT (aliases like L1 or START work too; raw numbers still work). The profile (controllers/<profile>.json at the repo root) turns each name into the number your pad sends - if a name lands on the wrong button, fix the profile with 'uv run map_controller.py' rather than editing here.",
+    "profile": "gamesir_cyclone2",
+    "pick_button": "RB",
+    "theme_button": "LB",
+    "reset_button": "X",
     "joystick_index": 0
   },
   "window": {

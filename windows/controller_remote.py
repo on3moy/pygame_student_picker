@@ -11,7 +11,10 @@ Usage:
     python controller_remote.py --setup    # calibrate deadzone/axis range for your controller
     python controller_remote.py --test     # live readout of the computed sensitivity zones
 
-Edit config.json to remap inputs. Press Ctrl+C in the terminal to quit.
+Edit config.json to remap inputs. With "controller_profile" set, inputs
+can be named ("LB") rather than numbered; the names come from
+controllers/<profile>.json, which map_controller.py at the repo root records.
+Press Ctrl+C in the terminal to quit.
 """
 
 import argparse
@@ -24,8 +27,11 @@ import pygame
 from pynput.keyboard import Controller as Keyboard, Key
 from pynput.mouse import Button, Controller as Mouse
 
-# Each OS folder has its own config.json, next to this script.
+# Each OS folder has its own config.json, next to this script. Controller
+# profiles (button names) are shared, in controllers/ at the repo root.
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import controllers  # noqa: E402
 
 keyboard = Keyboard()
 mouse = Mouse()
@@ -53,9 +59,27 @@ KEY_ACTIONS = {
 def load_config():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
-    # Normalize json string keys to ints where we index by number.
-    cfg["buttons"] = {int(k): v for k, v in cfg.get("buttons", {}).items()}
-    cfg["bumpers"] = {int(k): v for k, v in cfg.get("bumpers", {}).items()}
+    profile = controllers.load_profile_or_warn(cfg.get("controller_profile"))
+    cfg["profile"] = profile
+
+    def resolve(lookup, ref):
+        try:
+            return lookup(ref)
+        except ValueError as exc:
+            print(f"[warn] {exc}")
+            return None
+
+    # Keys may be numbers ("4") or profile names ("LB"); index by number.
+    for section in ("buttons", "bumpers"):
+        resolved = {}
+        for ref, action in cfg.get(section, {}).items():
+            index = resolve(profile.button, ref)
+            if index is not None:
+                resolved[index] = action
+        cfg[section] = resolved
+    # An axis that does not resolve is left out, so the defaults below apply.
+    axes = {role: resolve(profile.axis, ref) for role, ref in cfg.get("axes", {}).items()}
+    cfg["axes"] = {role: index for role, index in axes.items() if index is not None}
     return cfg
 
 
@@ -108,20 +132,25 @@ def init_joystick():
     return js
 
 
-def diagnose(js):
-    """Print every input as it changes so you can find the right numbers."""
+def diagnose(js, profile):
+    """Print every input as it changes so you can find the right numbers,
+    with the configured profile's name for each one."""
+    names = profile.button_names()
+    axis_names = {i: n for n, i in profile.axes.items()}
     print("\nDiagnostic mode. Press buttons / move sticks to see their numbers.")
     print("Press Ctrl+C to quit.\n")
     clock = pygame.time.Clock()
     while True:
         for event in pygame.event.get():
             if event.type == pygame.JOYBUTTONDOWN:
-                print(f"button {event.button} pressed")
+                name = f" ({names[event.button]})" if event.button in names else ""
+                print(f"button {event.button} pressed{name}")
             elif event.type == pygame.JOYHATMOTION:
                 print(f"hat {event.hat} -> {event.value}")
             elif event.type == pygame.JOYAXISMOTION:
                 if abs(event.value) > 0.5:
-                    print(f"axis {event.axis} = {event.value:+.2f}")
+                    label = f" ({axis_names[event.axis]})" if event.axis in axis_names else ""
+                    print(f"axis {event.axis}{label} = {event.value:+.2f}")
         clock.tick(60)
 
 
@@ -324,7 +353,7 @@ def main():
         if args.axes:
             axis_monitor(js)
         elif args.diagnose:
-            diagnose(js)
+            diagnose(js, load_config()["profile"])
         elif args.setup:
             setup_calibration(js)
         elif args.test:

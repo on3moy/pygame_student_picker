@@ -58,6 +58,10 @@ os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
 import pygame
 from pygame._sdl2 import video
 
+# Controller profiles (button names per pad) live in controllers/ at the repo root.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import controllers  # noqa: E402
+
 try:
     from pynput import keyboard as pynput_keyboard
 except ImportError:      # the keyboard backup is optional; the pad still works
@@ -113,7 +117,9 @@ RESIZE_STEP = 1.1         # keyboard / ctrl-wheel zoom per press
 # class are separate types that both derive from RuntimeError.
 WINDOW_ERRORS = (AttributeError, TypeError, ValueError, RuntimeError)
 
-# Standard SDL pad layout, used only to label buttons in messages.
+# Standard SDL pad layout, used only to label buttons in messages. Replaced by
+# the names in controller.profile when one is configured (see apply_profile).
+PROFILE = controllers.NO_PROFILE
 BUTTON_NAMES = {
     0: "A", 1: "B", 2: "X", 3: "Y", 4: "BACK", 5: "GUIDE", 6: "START",
     7: "L-STICK", 8: "R-STICK", 9: "LB", 10: "RB",
@@ -208,13 +214,44 @@ def _merge(base, override):
 def load_config():
     """Read mini_config.json, filling in anything missing from the defaults."""
     if not os.path.exists(CONFIG_PATH):
-        return dict(DEFAULT_CONFIG)
+        return apply_profile(dict(DEFAULT_CONFIG))
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            return _merge(DEFAULT_CONFIG, json.load(f))
+            return apply_profile(_merge(DEFAULT_CONFIG, json.load(f)))
     except (OSError, json.JSONDecodeError) as exc:
         log(f"[mini_picker] could not read mini_config.json ({exc}); using defaults")
-        return dict(DEFAULT_CONFIG)
+        return apply_profile(dict(DEFAULT_CONFIG))
+
+
+def apply_profile(cfg):
+    """Load controller.profile and turn named buttons ("RB") into numbers.
+
+    The rest of the picker only ever sees numbers; save_config turns them
+    back into names so the file stays readable.
+    """
+    global PROFILE, BUTTON_NAMES
+    pad = cfg["controller"] = dict(cfg["controller"])
+    PROFILE = controllers.load_profile_or_warn(pad.get("profile"), log)
+    if PROFILE.buttons:
+        BUTTON_NAMES = PROFILE.button_names()
+    for key, _prompt, _short in MAPPABLE:
+        try:
+            pad[key] = PROFILE.button(pad.get(key))
+        except ValueError as exc:
+            log(f"[mini_picker] {key}: {exc}")
+            pad[key] = None
+    return cfg
+
+
+def _button_refs(controller):
+    """Copy of the controller section with bound buttons written by name
+    where the profile has one."""
+    names = PROFILE.button_names()
+    out = dict(controller)
+    for key, _prompt, _short in MAPPABLE:
+        if out.get(key) in names:
+            out[key] = names[out[key]]
+    return out
 
 
 def save_config(cfg):
@@ -236,6 +273,8 @@ def save_config(cfg):
                 merged[key] = value
         return merged
 
+    if "controller" in cfg:
+        cfg = {**cfg, "controller": _button_refs(cfg["controller"])}
     try:
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(blend(on_disk, cfg), f, indent=2)

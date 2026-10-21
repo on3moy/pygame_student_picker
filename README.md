@@ -142,28 +142,44 @@ that means LB on one setup can be a trigger on another. A profile in
 ```
 
 Plain numbers still work everywhere. `controllers/gamesir_cyclone2.json` ships
-seeded from the default layouts; if a name lands on the wrong button, record
-what your pad really sends:
+seeded from the default layouts; if a name lands on the wrong button, or you
+have a new controller, record what your pad really sends:
 
 ```sh
-uv run map_controller.py gamesir_cyclone2   # guided: "Press LB - left bumper", you press it
-uv run map_controller.py --free gamesir_cyclone2   # press anything, then type its name
-uv run map_controller.py                    # new controller: creates controllers/<name>.json
+uv run map_controller.py                    # mapper window, on the template the configs use
+uv run map_controller.py gamesir_cyclone2   # mapper window, on that template
+uv run map_controller.py --terminal gamesir_cyclone2   # guided in the terminal: "Press LB", you press it
+uv run map_controller.py --free gamesir_cyclone2       # terminal: press anything, type its name
 uv run map_controller.py --show gamesir_cyclone2
 uv run map_controller.py --use gamesir_cyclone2   # point this OS's two configs at it
 ```
 
+The mapper window draws a controller next to the list of standard names, each
+with the number it is mapped to. Press something on the pad, type its name and
+press Enter. While you type, the matching names light up on the drawing. Holding a
+mapped input lights it too, so loading a template is also a quick test of it.
+
+| Key | Does |
+| --- | --- |
+| Enter | Give the pressed input the typed name |
+| Esc | Clear the pending input; quit when nothing is pending |
+| Ctrl+S | Name the template and save it to `controllers/<name>.json`, then offer to use it |
+| Ctrl+O | Load the next saved template |
+| Ctrl+N | Start a blank template |
+| Ctrl+T | Swap the drawing between the white and black Cyclone 2 |
+
 The standard names are `A B X Y LB RB LT RT VIEW MENU HOME L3 R3` for buttons
-and `LX LY RX RY` for the sticks (defined in `controllers/__init__.py`). Guided
-mode asks for exactly these, so you never type one. `--free` accepts them and
-common aliases (`L1` → `LB`, `START` → `MENU`), and asks before keeping
-anything else as a custom name.
+and `LX LY RX RY` for the sticks (defined in `controllers/__init__.py`). Common
+aliases work too (`L1` → `LB`, `START` → `MENU`). Anything else is kept as a
+custom name after you confirm it, e.g. `D-UP` for a D-pad that sends buttons
+(Windows).
 
 Each profile has a `linux` and a `windows` section; the mapper writes the one
 for the OS it runs on. Stop `controller_remote.py` while mapping, or pad presses
 also type keys into the terminal. On the Cyclone 2, the numbers change with the
 connection mode and with the M + A face-button swap, so map it in the mode you use.
-The Windows scripts do not read profiles yet.
+The Cyclone 2's `windows` section is seeded from SDL's XInput layout and has not
+been checked on the pad yet. Map it once on Windows to confirm it.
 
 ## Where the controller buttons are mapped
 
@@ -193,8 +209,9 @@ another`) rather than silently taken away from it.
 
 ### 2. In `windows/mini_config.json` or `linux/mini_config.json` (by hand)
 
-On Linux, buttons are written by name and the
-[controller profile](#controller-profiles) turns each one into a number:
+Buttons are written by name and the
+[controller profile](#controller-profiles) turns each one into a number
+(Linux example):
 
 ```json
 "controller": {
@@ -208,17 +225,8 @@ On Linux, buttons are written by name and the
 ```
 
 Names: `A B X Y LB RB LT RT VIEW MENU HOME L3 R3`. The picker writes names back
-when you rebind with `L`. The Windows picker does not read profiles yet, so
-`windows/mini_config.json` still uses numbers:
-
-```json
-"controller": {
-  "pick_button": 10,
-  "theme_button": 3,
-  "reset_button": 2,
-  "joystick_index": 0
-}
-```
+when you rebind with `L`. Plain numbers still work, which is what the tables
+below are for.
 
 `null` leaves an action unmapped. `joystick_index` picks which pad to listen to
 if you have more than one plugged in. The standard SDL button numbers on

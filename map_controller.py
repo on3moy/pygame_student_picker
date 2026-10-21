@@ -1,24 +1,29 @@
 """
 Map a controller's buttons by pressing them.
 
-Guided (the default): it names each control in turn - "Press LB - left
-bumper" - and you press it. You never type a name, so the names always match
-the ones the configs use. --free flips it round: press anything, then type
-its name; only standard names (or their aliases, L1 = LB) are accepted
-without asking.
+The default is a window with a drawing of a pad and the list of standard
+names: press something on the pad, type its name (A, LB, l1 = LB...), Enter.
+Ctrl+S names the template and saves it, Ctrl+O loads the next saved one.
+Holding a mapped input lights it up, so loading a template also tests it.
+
+Two terminal modes stay for when there is no screen: --terminal names each
+control in turn - "Press LB - left bumper" - and you press it; --free is
+press anything, then type its name.
 
 The result is saved to controllers/<profile>.json for this OS, and the
 configs then say "LB" instead of a number that may belong to another button.
 
 Usage:
-    uv run map_controller.py gamesir_cyclone2   # guided (re)map of that profile
-    uv run map_controller.py                    # pick or create a profile, then guided
-    uv run map_controller.py --free gamesir_cyclone2   # press anything, type its name
+    uv run map_controller.py                    # window; pick a template inside it
+    uv run map_controller.py gamesir_cyclone2   # window, starting on that template
+    uv run map_controller.py --terminal gamesir_cyclone2   # guided, in the terminal
+    uv run map_controller.py --free gamesir_cyclone2       # press anything, type its name
     uv run map_controller.py --list             # show the profiles in controllers/
     uv run map_controller.py --show gamesir_cyclone2
     uv run map_controller.py --use gamesir_cyclone2   # point this OS's configs at a profile
 
-Nothing is written until you confirm at the end.
+Nothing is written until you save (Ctrl+S in the window, or confirm at the
+end in the terminal).
 
 Numbers come from pygame, the same as the picker; on Linux pygame is told to
 use the kernel driver so they also match controller_remote.py.
@@ -39,18 +44,18 @@ from controllers import OS_KEY, STANDARD, STANDARD_NAMES
 if OS_KEY == "linux":
     os.environ.setdefault("SDL_JOYSTICK_HIDAPI", "0")
 os.environ.setdefault("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1")
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")  # no window needed
 os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+# The video driver is chosen in main(): none for the terminal modes, native
+# Wayland for the window. SDL reads these hints at pygame.init(), not import.
 
 import pygame  # noqa: E402  (after the SDL hints above)
+
+from controllers.capture import Burst, assign, held, rest_values, what_was  # noqa: E402
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 OS_DIR = os.path.join(ROOT, OS_KEY)
 REMOTE_CONFIG = os.path.join(OS_DIR, "config.json")
 PICKER_CONFIG = os.path.join(OS_DIR, "mini_config.json")
-
-AXIS_TRIGGER = 0.6     # how far an axis must move from rest to count
-SETTLE_SECONDS = 0.25  # gather the burst one press makes (LT = button + axis)
 
 
 def ask(prompt, default=""):
@@ -90,14 +95,6 @@ def device_info(pad):
     return info
 
 
-def rest_values(pad):
-    """Each axis's idle value (triggers rest at -1, sticks near 0)."""
-    for _ in range(10):
-        pygame.event.pump()
-        time.sleep(0.02)
-    return [pad.get_axis(i) for i in range(pad.get_numaxes())]
-
-
 def keyboard_line():
     """A line typed in the terminal, or None if nothing is waiting.
     End of input reads as 'q'."""
@@ -112,32 +109,20 @@ def keyboard_line():
 
 def wait_for_input(pad, rest, keyboard=False):
     """Block until the pad does something - or, with keyboard=True, until a
-    line is typed. Returns (typed, buttons, axes, hat_seen). Pad input is
-    collected over a short window, so a trigger that sends both a button and
-    an axis comes back as one press; axes are listed largest move first."""
+    line is typed. Returns (typed, buttons, axes, hat_seen)."""
     pygame.event.clear()
-    buttons, moved, hat = [], {}, False
-    deadline = None
-    while deadline is None or time.monotonic() < deadline:
-        if keyboard and deadline is None:
+    burst = Burst(rest)
+    while True:
+        if keyboard and not burst.started:
             typed = keyboard_line()
             if typed is not None:
                 return typed, [], [], False
         for ev in pygame.event.get():
-            if ev.type == pygame.JOYBUTTONDOWN and ev.button not in buttons:
-                buttons.append(ev.button)
-            elif ev.type == pygame.JOYAXISMOTION and ev.axis < len(rest) \
-                    and abs(ev.value - rest[ev.axis]) > AXIS_TRIGGER:
-                moved[ev.axis] = max(moved.get(ev.axis, 0), abs(ev.value - rest[ev.axis]))
-            elif ev.type == pygame.JOYHATMOTION and ev.value != (0, 0):
-                hat = True
-            else:
-                continue
-            if deadline is None:
-                deadline = time.monotonic() + SETTLE_SECONDS
+            burst.feed(ev)
+        got = burst.ready()
+        if got:
+            return (None, *got)
         time.sleep(0.01)
-    axes = sorted(moved, key=moved.get, reverse=True)
-    return None, buttons, axes, hat
 
 
 def wait_for_release(pad, rest):
@@ -145,29 +130,14 @@ def wait_for_release(pad, rest):
     not immediately count as the next input."""
     while True:
         pygame.event.pump()
-        held = any(pad.get_button(i) for i in range(pad.get_numbuttons()))
-        held = held or any(abs(pad.get_axis(i) - rest[i]) > AXIS_TRIGGER / 2
-                           for i in range(len(rest)))
-        if not held:
+        if not held(pad, rest):
             return
         time.sleep(0.02)
-
-
-def assign(table, name, index):
-    """name -> index, dropping any other name that pointed at index."""
-    for other in [n for n, i in table.items() if i == index and n != name]:
-        del table[other]
-    table[name] = index
 
 
 def describe(table, index):
     names = [n for n, i in table.items() if i == index]
     return f" (now {'/'.join(names)})" if names else ""
-
-
-def what_was(pressed, moved, hat):
-    parts = [f"button {b}" for b in pressed] + [f"axis {a}" for a in moved]
-    return " + ".join(parts) or ("the D-pad" if hat else "nothing")
 
 
 def guided_session(pad, buttons, axes):
@@ -288,6 +258,7 @@ def use_profile(key):
         edit_json(PICKER_CONFIG, lambda cfg: cfg.setdefault("controller", {}).__setitem__("profile", key))
         done.append(os.path.relpath(PICKER_CONFIG, ROOT))
     print(f"Using {key} in: {', '.join(done) or 'no configs found'}")
+    return done
 
 
 def current_profile_key():
@@ -307,8 +278,10 @@ def current_profile_key():
 def main():
     parser = argparse.ArgumentParser(description="Map controller buttons to names, saved in controllers/")
     parser.add_argument("profile", nargs="?", help="profile name (file in controllers/ without .json)")
+    parser.add_argument("--terminal", action="store_true",
+                        help="guided mapping in the terminal (it names each control, you press it)")
     parser.add_argument("--free", action="store_true",
-                        help="press anything, then type its name (instead of the guided list)")
+                        help="in the terminal: press anything, then type its name")
     parser.add_argument("--list", action="store_true", help="list the profiles in controllers/")
     parser.add_argument("--show", metavar="PROFILE", help="print a profile's layout for this OS")
     parser.add_argument("--use", metavar="PROFILE", help="point this OS's configs at PROFILE")
@@ -332,8 +305,22 @@ def main():
         print("Note: controller_remote.py is running, so pad presses will also type keys here.")
         print("      Stop it (Ctrl+C in its terminal) for a cleaner mapping session.\n")
 
+    window = not (args.terminal or args.free)
+    if not window:
+        os.environ.setdefault("SDL_VIDEODRIVER", "dummy")  # no window needed
+    elif os.environ.get("WAYLAND_DISPLAY"):
+        # pygame 2.6's SDL would otherwise go through XWayland.
+        os.environ.setdefault("SDL_VIDEODRIVER", "wayland")
+
     pad = open_pad(args.joystick)
     device = device_info(pad)
+
+    if window:
+        from controllers import mapper_window
+        mapper_window.run(pad, device, args.profile or current_profile_key(),
+                          save=controllers.save_layout, use=use_profile,
+                          in_use=current_profile_key)
+        return
 
     key = args.profile
     if not key:
