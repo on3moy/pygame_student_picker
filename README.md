@@ -102,7 +102,7 @@ only; they are not written back to `mini_config.json`.
 | `R` / pad **X** (2) | Start a fresh round early (rarely needed — see below) |
 | `L` | Map your controller buttons (see below) |
 | `H` | Show the current button mapping (Linux: a popup listing every control — see below) |
-| `F` | Load a different roster `.txt` |
+| `F` (Windows) / pad **START** (Linux) | Load a different roster `.txt` |
 | `O` | Toggle always-on-top (Windows only) |
 | Left-drag | Move the window, position remembered (Windows only) |
 | Drag the corner grip | Resize the window (Windows only) |
@@ -271,7 +271,7 @@ One per OS: `windows/mini_config.json` and `linux/mini_config.json`. Behavior �
 | `controller.pick_button` | Button that draws a name. |
 | `controller.theme_button` | Button that cycles to the next theme. |
 | `controller.reset_button` | Button that resets the pool; `null` to disable. |
-| `controller.roster_button` | Linux only: button that opens the roster file dialog, like `F`. |
+| `controller.roster_button` | Linux only: button that opens the roster file dialog (Linux has no `F` key for it, so the slide remote's `f` can't open it). |
 | `controller.joystick_index` | Which pad to listen to, if several are plugged in. |
 | `window.x` / `window.y` | Saved screen position; `null` centers the window. |
 | `window.width` / `window.height` | Saved window size; `null` uses the theme's design size. |
@@ -280,7 +280,7 @@ One per OS: `windows/mini_config.json` and `linux/mini_config.json`. Behavior �
 | `no_repeats` | `true` drops a picked name until everyone has been called. |
 
 The file is rewritten when you rebind a button, cycle the theme, move the window,
-or load a roster with `F`. Comment keys (`_comment`, `_theme`, …) are preserved.
+or load a roster (`F` on Windows, START on Linux). Comment keys (`_comment`, `_theme`, …) are preserved.
 
 ## Themes
 

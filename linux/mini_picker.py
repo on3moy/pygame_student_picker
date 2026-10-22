@@ -34,7 +34,9 @@ Controls:
                                       Esc cancels)
     H                                 pop up every control, in the current
                                       theme; picking one runs it
-    F                                 load a different roster .txt
+    START (MENU) on the pad           load a different roster .txt (no
+                                      keyboard key: the slide remote types
+                                      "f" for full screen; H can run it too)
     + / - / 0                         grow / shrink / reset the size
     Esc / window close                quit
 
@@ -1381,7 +1383,8 @@ def main():
             ("F9", "Next student, from any window", on_pick),
             ("L", "Map controller buttons", start_mapping),
             ("S  /  ESC  (while mapping)", "Skip a button / cancel", None),
-            (with_pad("F", "roster_button"), "Load roster", open_roster_dialog),
+            (f"PAD {button_label(cfg['controller'].get('roster_button'))}", "Load roster",
+             open_roster_dialog),
             ("+  or  CTRL + WHEEL UP", "Grow the window",
              lambda: zoom(RESIZE_STEP)),
             ("-  or  CTRL + WHEEL DOWN", "Shrink the window",
@@ -1538,8 +1541,6 @@ def main():
                     reset_size()
                 elif event.key == pygame.K_h:
                     open_help()
-                elif event.key == pygame.K_f:
-                    open_roster_dialog()
 
             elif event.type == ROSTER_CHOSEN:
                 choosing_file = False
@@ -1612,7 +1613,7 @@ def main():
             border_color = colors["border_flash"]
 
         # Footer: transient message wins, then a hint, then the counter.
-        hint = "" if all_students else "Press F to load a roster"
+        hint = "" if all_students else "Press START to load a roster"
         footer_text = ""
         if message and now < message_until:
             footer_text = message

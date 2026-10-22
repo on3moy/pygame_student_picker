@@ -1,9 +1,9 @@
 {
-  "_comment": "Behavior settings for mini_picker.py. Looks live in themes/*.json. The picker rewrites this file when you rebind controller buttons (L), cycle the theme (T), move the window, or load a different roster (F).",
+  "_comment": "Behavior settings for mini_picker.py. Looks live in themes/*.json. The picker rewrites this file when you rebind controller buttons (L), cycle the theme (T), move the window, or load a different roster (START on the pad).",
   "students_file": "/home/on3moy/Documents/vscode/github/pygame_student_picker/students.txt",
   "_students_file": "Path to the roster .txt, one name per line. Relative paths resolve against this folder; absolute paths work too. The file is re-read about once a second while running, so edits land without a restart.",
-  "theme": "vscode",
-  "_theme": "Filename (without .json) of a theme in themes/. T on the keyboard or Y on the pad cycles through them.",
+  "theme": "dracula",
+  "_theme": "Filename (without .json) of a theme in themes/. T on the keyboard or theme_button on the pad cycles through them.",
   "controller": {
     "_comment": "Which pad button does what. In normal use you only need pick_button (NEXT) - the pool refills itself when everyone has been called, so reset is optional. Easiest way to set these: press L in the window and it walks you through pick / theme / reset / roster - press the button you want for each (S skips one, Esc cancels), and your choices are written back here. Press H in the window to see the current mapping. Set null to leave an action unmapped. Buttons are names: A B X Y LB RB LT RT VIEW MENU HOME L3 R3 (aliases like L1 or START work too; raw numbers still work). The profile (controllers/<profile>.json at the repo root) turns each name into the number your pad sends - if a name lands on the wrong button, fix the profile with 'uv run map_controller.py' rather than editing here. The D-pad is a hat, not buttons.",
     "profile": "gamesir_cyclone2",
